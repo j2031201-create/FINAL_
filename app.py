@@ -43,14 +43,14 @@ html, body, .stApp { font-family:'Noto Sans KR',sans-serif !important; backgroun
 .sec-title::before { content:''; width:3px; height:15px; background:#03C75A; border-radius:2px; }
 
 /* 사이드바 + 입력칸 가독성 (검은배경 버그 수정) */
-[data-testid="stSidebar"] { background:#fff !important; border-right:1px solid #E5E8EB !important; }
+[data-testid="stSidebar"] { background:#FAFBFB !important; border-right:1px solid #E5E8EB !important; }
 [data-testid="stSidebar"] * { font-family:'Noto Sans KR',sans-serif !important; }
 .side-h { font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }
 /* 텍스트/숫자 입력칸: 흰 배경 + 검정 글씨 강제 */
 input[type="text"], input[type="number"],
 .stTextInput input, .stNumberInput input,
 [data-testid="stSidebar"] input {
-    background:#FFFFFF !important; color:#191F28 !important;
+    background:#F2F4F6 !important; color:#191F28 !important;
     border:1.5px solid #D1D6DB !important; border-radius:8px !important;
     font-size:14px !important; -webkit-text-fill-color:#191F28 !important;
 }
@@ -249,7 +249,8 @@ with col2:
             if r.data:
                 df = pd.DataFrame(r.data)
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
-                df.columns = ["분석일시","구역명","유형","비례율(%)","사업이익(억)","판정"]
+                df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
+                df.columns = ["분석일자","구역명","유형","비례율(%)","사업이익(억)","판정"]
                 st.dataframe(df, use_container_width=True, hide_index=True)
             else:
                 st.info("저장된 데이터가 없습니다.")
