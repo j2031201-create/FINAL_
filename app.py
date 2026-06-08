@@ -41,15 +41,31 @@ html, body, .stApp { font-family:'Noto Sans KR',sans-serif !important; backgroun
 .v-warning { background:#FFF4E6; } .v-warning h4,.v-warning p { color:#E8590C; }
 .sec-title { font-size:15px; font-weight:700; color:#191F28; margin:20px 0 12px; display:flex; align-items:center; gap:8px; }
 .sec-title::before { content:''; width:3px; height:15px; background:#03C75A; border-radius:2px; }
+
+/* 사이드바 + 입력칸 가독성 (검은배경 버그 수정) */
 [data-testid="stSidebar"] { background:#fff !important; border-right:1px solid #E5E8EB !important; }
 [data-testid="stSidebar"] * { font-family:'Noto Sans KR',sans-serif !important; }
 .side-h { font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }
-.stNumberInput input, .stTextInput input { border:1.5px solid #D1D6DB !important; border-radius:8px !important; font-size:14px !important; color:#191F28 !important; }
-.stNumberInput input:focus, .stTextInput input:focus { border-color:#03C75A !important; box-shadow:0 0 0 3px rgba(3,199,90,.12) !important; }
+/* 텍스트/숫자 입력칸: 흰 배경 + 검정 글씨 강제 */
+input[type="text"], input[type="number"],
+.stTextInput input, .stNumberInput input,
+[data-testid="stSidebar"] input {
+    background:#FFFFFF !important; color:#191F28 !important;
+    border:1.5px solid #D1D6DB !important; border-radius:8px !important;
+    font-size:14px !important; -webkit-text-fill-color:#191F28 !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus {
+    border-color:#03C75A !important; box-shadow:0 0 0 3px rgba(3,199,90,.12) !important;
+}
+/* 숫자입력 +/- 버튼 */
+[data-testid="stNumberInput"] button { background:#F2F4F6 !important; color:#191F28 !important; border:1px solid #D1D6DB !important; }
+/* 라디오/슬라이더 라벨 */
+[data-testid="stSidebar"] label, [data-testid="stWidgetLabel"] label { color:#4E5968 !important; font-weight:500 !important; }
+[data-testid="stSidebar"] .stRadio label { color:#191F28 !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color:#8B95A1 !important; }
 .stButton>button { background:#03C75A !important; color:#fff !important; border:none !important; border-radius:8px !important; font-weight:700 !important; font-size:14px !important; padding:10px 20px !important; transition:.15s !important; }
 .stButton>button:hover { background:#02B350 !important; transform:translateY(-1px); }
-.stButton>button:disabled { background:#D1D6DB !important; }
-label { font-size:12px !important; font-weight:500 !important; color:#4E5968 !important; }
+.stButton>button:disabled { background:#D1D6DB !important; color:#fff !important; }
 .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .chip { font-size:11px; font-weight:500; padding:4px 11px; border-radius:100px; display:inline-flex; align-items:center; gap:4px; }
 .chip.ok { background:#E7F9F0; color:#03864A; } .chip.no { background:#FFF4E6; color:#E8590C; }
@@ -58,7 +74,7 @@ label { font-size:12px !important; font-weight:500 !important; color:#4E5968 !im
 .bar-line .bl { font-size:13px; color:#4E5968; flex:0 0 80px; font-weight:500; }
 .bar-track { flex:1; height:10px; background:#F2F4F6; border-radius:100px; overflow:hidden; }
 .bar-fill { height:100%; border-radius:100px; background:#03C75A; }
-.bar-line .bv { font-size:13px; font-weight:700; color:#191F28; flex:0 0 80px; text-align:right; }
+.bar-line .bv { font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,20 +92,23 @@ try:
 except Exception:
     SB_ON = False
 
-AVG_PYEONG = 25
 PT_LABEL = {"rebuild":"재건축","redevelop":"재개발","small":"소규모정비"}
 
-def calc_business(units, prev, price, cc, gr, pt):
-    tp = units*AVG_PYEONG
-    sales = tp*(gr/100)*price/10000
-    con = tp*cc/10000
-    total_cost = con*(1+(0.28 if pt=="small" else 0.35))
-    post = sales + tp*(1-gr/100)*price*0.85/10000
+# ── 실무 표준 비례율 엔진 ─────────────────────────────
+def calc_business(total_units, member_units, avg_pyeong,
+                  member_price, general_price, cc, other_rate, prev):
+    general_units = max(total_units - member_units, 0)
+    member_py = member_units * avg_pyeong
+    general_py = general_units * avg_pyeong
+    total_py = total_units * avg_pyeong
+    post = (member_py*member_price + general_py*general_price)/10000      # 종후자산(억)
+    construct = total_py*cc/10000
+    total_cost = construct*(1+other_rate)                                 # 총사업비(억)
     biryul = ((post-total_cost)/prev*100) if prev>0 else 0
-    return dict(sales=sales, post=post, total_cost=total_cost,
-                biryul=biryul, profit=post-total_cost-prev)
+    return dict(general_units=general_units, post=post, construct=construct,
+                total_cost=total_cost, biryul=biryul, profit=post-total_cost-prev)
 
-def calc_req(pt, area, year, diag, oldr, lot, agree, stype, units):
+def calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units):
     reqs, score, sd = [], None, ""
     if pt=="rebuild":
         age=dt.date.today().year-year
@@ -103,7 +122,7 @@ def calc_req(pt, area, year, diag, oldr, lot, agree, stype, units):
         score=sa+so+sl+10
         reqs=[("노후2/3",oo),("면적1만㎡",ar),(f"정비지수{round(score)}",score>=60)]; okv=oo and ar; sd=f"{round(score)}/100"
     else:
-        ar=area<10000; oo=oldr>=66.7; uo=units<200 if stype=="소규모재건축" else True
+        ar=area<10000; oo=oldr>=66.7; uo=total_units<200 if stype=="소규모재건축" else True
         reqs=[("면적1만㎡미만",ar),("노후2/3",oo)]
         if stype=="소규모재건축": reqs.append(("200세대미만",uo))
         okv=ar and oo and uo; sd="적합" if okv else "미달"
@@ -126,6 +145,7 @@ with st.sidebar:
     st.markdown('<div class="side-h">📍 구역 정보</div>', unsafe_allow_html=True)
     region_name = st.text_input("구역명", "○○3 후보구역", label_visibility="collapsed")
     pt = st.radio("사업 유형", ["rebuild","redevelop","small"], format_func=lambda x:PT_LABEL[x])
+
     st.markdown('<div class="side-h">🏘️ 구역 요건</div>', unsafe_allow_html=True)
     area = st.number_input("구역면적 (㎡)", 0, value=35000, step=1000)
     year, diag, oldr, lot, stype = 1992, "통과(D/E)", 75.0, 30.0, "가로주택"
@@ -141,15 +161,24 @@ with st.sidebar:
         oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, 70.0)
         st.caption("가로주택: 1만㎡ 미만 · 안전진단 면제" if stype=="가로주택" else "소규모재건축: 1만㎡·200세대 미만 + 안전진단")
     agree = st.slider("주민동의율 (%)", 50.0, 100.0, 75.0)
-    st.markdown('<div class="side-h">💰 사업성 입력</div>', unsafe_allow_html=True)
-    units = st.number_input("세대수", 1, value=600, step=10)
-    prev = st.number_input("종전자산 (억)", 0, value=2000, step=100)
-    price = st.slider("일반분양가 (만원/평)", 1500, 5000, 2800, step=50)
-    cc = st.slider("공사비 (만원/평)", 400, 900, 650, step=10)
-    gr = st.slider("일반분양 비율 (%)", 20, 70, 45)
 
-biz = calc_business(units, prev, price, cc, gr, pt)
-reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, units)
+    st.markdown('<div class="side-h">🏢 분양 계획</div>', unsafe_allow_html=True)
+    total_units = st.number_input("신축 총세대", 1, value=600, step=10)
+    member_units = st.number_input("조합원 분양세대", 0, value=350, step=10,
+                                   help="나머지가 일반분양분이 됩니다")
+    avg_py = st.number_input("세대당 분양면적 (평)", 10, 60, 25)
+
+    st.markdown('<div class="side-h">💰 사업성 입력</div>', unsafe_allow_html=True)
+    prev = st.number_input("종전자산 총액 (억)", 0, value=2000, step=100,
+                           help="조합원 보유 토지·건물 감정가 합계")
+    g_price = st.slider("일반분양가 (만원/평)", 1500, 5000, 2800, step=50)
+    m_price = st.slider("조합원분양가 (만원/평)", 1500, 5000, 2500, step=50)
+    cc = st.slider("공사비 (만원/평)", 400, 900, 650, step=10)
+    other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50,
+                           28 if pt=="small" else 35) / 100
+
+biz = calc_business(total_units, member_units, avg_py, m_price, g_price, cc, other_rate, prev)
+reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units)
 vk, vi, vt, vd = verdict(biz["biryul"], okv)
 
 law = "빈집·소규모주택 정비 특례법" if pt=="small" else "도시 및 주거환경정비법"
@@ -180,11 +209,12 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown(f'<div class="sec-title">사업성 구조 ({PT_LABEL[pt]})</div>', unsafe_allow_html=True)
-mx = max(biz["post"], biz["total_cost"], prev, biz["sales"], 1)
-items = [("분양수입",biz["sales"]),("종후자산",biz["post"]),("총사업비",biz["total_cost"]),("종전자산",prev)]
+st.markdown(f'<div class="sec-title">사업성 구조 ({PT_LABEL[pt]}) · 일반분양 {biz["general_units"]}세대</div>', unsafe_allow_html=True)
+mx = max(biz["post"], biz["total_cost"], prev, 1)
+items = [("종후자산",biz["post"]),("총사업비",biz["total_cost"]),("종전자산",prev),("사업이익",max(biz["profit"],0))]
 bars = "".join(f'<div class="bar-line"><span class="bl">{n}</span><div class="bar-track"><div class="bar-fill" style="width:{min(v/mx*100,100):.0f}%;"></div></div><span class="bv">{v:,.0f}억</span></div>' for n,v in items)
 st.markdown(f'<div class="struct">{bars}</div>', unsafe_allow_html=True)
+st.caption("비례율 = (종후자산 − 총사업비) ÷ 종전자산 × 100 · 실무 표준 공식")
 
 st.markdown('<div class="sec-title">분석 결과 저장</div>', unsafe_allow_html=True)
 if SB_ON:
@@ -199,8 +229,8 @@ with col1:
                    small_type=stype if pt=="small" else None,
                    area_sqm=area, built_year=year if pt=="rebuild" else None,
                    diagnosis=diag if pt=="rebuild" else None, old_ratio=oldr,
-                   small_lot=lot, agree_ratio=agree, units=units, prev_asset=prev,
-                   sale_price=price, construct_cost=cc, gen_ratio=gr,
+                   small_lot=lot, agree_ratio=agree, units=total_units, prev_asset=prev,
+                   sale_price=g_price, construct_cost=cc, gen_ratio=round(biz["general_units"]/total_units*100,1),
                    biryul=round(biz["biryul"],2), total_cost=round(biz["total_cost"],1),
                    profit=round(biz["profit"],1),
                    jeongbi_score=round(score,1) if score is not None else None,
@@ -226,4 +256,4 @@ with col2:
         except Exception as e:
             st.error(f"조회 실패: {e}")
 
-st.caption("⚠️ 예시 데이터 기반 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
+st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
