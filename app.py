@@ -361,9 +361,16 @@ with left:
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
                 df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
                 df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
-                st.markdown('<div class="excel-sheet">', unsafe_allow_html=True)
-                st.dataframe(df, use_container_width=True, height=440, hide_index=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                sty = df.style.set_properties(**{
+                    "background-color": "#FFFFFF", "color": "#000000",
+                    "border": "1px solid #000000"
+                }).set_table_styles([
+                    {"selector": "th", "props": [("background-color", "#FFFFFF"),
+                                                  ("color", "#000000"), ("font-weight", "700"),
+                                                  ("border", "1px solid #000000")]},
+                    {"selector": "td", "props": [("border", "1px solid #000000")]}
+                ])
+                st.dataframe(sty, use_container_width=True, height=440, hide_index=True)
             else:
                 st.info("저장된 데이터가 없습니다.")
         except Exception as e:
