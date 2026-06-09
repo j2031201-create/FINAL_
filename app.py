@@ -21,15 +21,23 @@ SOFT_BG = "#EAF0F8" if ADV else "#E8F1FF"
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
-html, body, .stApp, .stApp p, .stApp span, .stApp div, .stApp h1, .stApp h2, .stApp h3,
-.stApp h4, .stApp label, .stApp input, .stApp button, .stApp td, .stApp th {{
+/* 본문 텍스트에만 한글 폰트 적용 (아이콘 span은 건드리지 않음) */
+html, body, .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp label, .stApp input, .stApp button, .stApp td, .stApp th,
+.stApp li, .stApp a {{
     font-family:'Noto Sans KR',sans-serif;
 }}
 .stApp {{ background:#F4F6F9 !important; color:#1A1A1A !important; }}
-[class*="material-icons"], [data-testid="stIconMaterial"], span[role="img"],
-.material-icons, .material-symbols-outlined, [data-testid="collapsedControl"] *,
-[data-testid="stSidebarCollapseButton"] *, [data-testid="baseButton-headerNoPadding"] * {{
-    font-family:'Material Symbols Outlined','Material Icons' !important;
+/* 아이콘 폰트는 절대 덮어쓰지 않음 - Streamlit 기본값 유지 */
+[data-testid="stIconMaterial"], .material-icons, .material-symbols-outlined,
+[data-testid="stIconMaterial"] * {{
+    font-family:'Material Symbols Rounded','Material Symbols Outlined','Material Icons' !important;
+    font-feature-settings:'liga' !important;
+}}
+/* 깨진 아이콘 텍스트가 보이는 최후 안전장치: 토글 버튼 라벨 숨김 폭 제한 */
+[data-testid="stSidebarCollapseButton"] span:not([data-testid="stIconMaterial"]),
+[data-testid="collapsedControl"] span:not([data-testid="stIconMaterial"]) {{
+    font-size:0 !important;
 }}
 #MainMenu, footer {{ display:none !important; }}
 .main .block-container {{ padding:0 2rem 3rem !important; max-width:1600px !important; }}
@@ -60,6 +68,9 @@ html, body, .stApp, .stApp p, .stApp span, .stApp div, .stApp h1, .stApp h2, .st
 .sec-title {{ font-size:15px; font-weight:700; color:#191F28; margin:18px 0 12px; display:flex; align-items:center; gap:8px; }}
 .sec-title::before {{ content:''; width:3px; height:15px; background:{ACCENT}; border-radius:2px; }}
 [data-testid="stSidebar"] {{ background:#FAFBFC !important; border-right:1px solid #E5E8EB !important; }}
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div:not([data-testid="stIconMaterial"]) {{
+    font-family:'Noto Sans KR',sans-serif;
+}}
 .side-h {{ font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }}
 input[type="text"], input[type="number"],
 .stTextInput input, .stNumberInput input,
@@ -355,7 +366,24 @@ with left:
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
                 df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
                 df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
-                st.dataframe(df, use_container_width=True, height=440, hide_index=True)
+                # HTML 표로 직접 렌더링 (흰 바탕·검은 글씨·검은 격자 100% 보장)
+                thead = "".join(f'<th>{c}</th>' for c in df.columns)
+                tbody = ""
+                for _, rrow in df.iterrows():
+                    tds = "".join(f'<td>{v}</td>' for v in rrow)
+                    tbody += f'<tr>{tds}</tr>'
+                table_html = f"""
+                <div style="max-height:440px;overflow-y:auto;border:1px solid #000;">
+                <table style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
+                  <thead><tr style="background:#fff;">{thead}</tr></thead>
+                  <tbody>{tbody}</tbody>
+                </table></div>
+                <style>
+                .stMarkdown table th {{ background:#fff !important; color:#000 !important; border:1px solid #000 !important; padding:8px 10px; font-weight:700; text-align:left; }}
+                .stMarkdown table td {{ background:#fff !important; color:#000 !important; border:1px solid #000 !important; padding:7px 10px; }}
+                </style>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
             else:
                 st.info("저장된 데이터가 없습니다.")
         except Exception as e:
