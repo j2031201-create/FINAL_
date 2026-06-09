@@ -1,7 +1,6 @@
 """
 정비사업 수주 타당성 분석 플랫폼
-시행사 사업개발팀용 · Basic(스크리닝) / Advanced(상세 수지분석) 2-모드
-B2B SaaS · Navy & Blue 테마 · Split-screen 레이아웃
+시행사 사업개발팀용 · Basic / Advanced 2-모드 · ㎡ 단위 · Navy & Blue · Split-screen
 """
 import streamlit as st
 import pandas as pd
@@ -10,22 +9,28 @@ import datetime as dt
 st.set_page_config(page_title="정비사업 수주 타당성 분석", page_icon="🏗️",
                    layout="wide", initial_sidebar_state="expanded")
 
-# 모드 상태
 if "mode" not in st.session_state:
     st.session_state.mode = "basic"
 
 ADV = st.session_state.mode == "advanced"
-# 컬러 시스템 (Trustworthy Navy & Blue)
-ACCENT = "#0F2A4A" if ADV else "#1B64DA"      # 메인 포인트
-ACCENT2 = "#1E3A8A" if ADV else "#1B64DA"     # 서브
+ACCENT = "#0F2A4A" if ADV else "#1B64DA"
+ACCENT2 = "#1E3A8A" if ADV else "#1B64DA"
 HEAD_BG = "#0F2A4A" if ADV else "#1B64DA"
-SOFT_BG = "#EAF0F8" if ADV else "#E8F1FF"     # 연한 배경
+SOFT_BG = "#EAF0F8" if ADV else "#E8F1FF"
 
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
-html, body, .stApp {{ font-family:'Noto Sans KR',sans-serif !important; background:#F4F6F9 !important; color:#1A1A1A !important; }}
-/* 사이드바 토글 버튼은 살리고 메뉴/푸터만 숨김 */
+html, body, .stApp, .stApp p, .stApp span, .stApp div, .stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp label, .stApp input, .stApp button, .stApp td, .stApp th {{
+    font-family:'Noto Sans KR',sans-serif;
+}}
+.stApp {{ background:#F4F6F9 !important; color:#1A1A1A !important; }}
+[class*="material-icons"], [data-testid="stIconMaterial"], span[role="img"],
+.material-icons, .material-symbols-outlined, [data-testid="collapsedControl"] *,
+[data-testid="stSidebarCollapseButton"] *, [data-testid="baseButton-headerNoPadding"] * {{
+    font-family:'Material Symbols Outlined','Material Icons' !important;
+}}
 #MainMenu, footer {{ display:none !important; }}
 .main .block-container {{ padding:0 2rem 3rem !important; max-width:1600px !important; }}
 .top-header {{ background:{HEAD_BG}; margin:0 -2rem 0; padding:14px 2rem; display:flex; align-items:center; gap:16px; }}
@@ -33,19 +38,18 @@ html, body, .stApp {{ font-family:'Noto Sans KR',sans-serif !important; backgrou
 .top-header .brand-sub {{ font-size:11px; font-weight:500; color:rgba(255,255,255,.85); padding:2px 9px; background:rgba(255,255,255,.18); border-radius:100px; }}
 .top-header .spacer {{ flex:1; }}
 .top-header .head-link {{ font-size:13px; color:rgba(255,255,255,.92); font-weight:500; }}
-.region-bar {{ background:#fff; border:1px solid #E5E8EB; border-top:none; margin:0 -2rem 20px; padding:14px 2rem; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }}
-.region-bar .rname {{ font-size:17px; font-weight:700; color:#191F28; }}
-.region-bar .rtag {{ font-size:12px; font-weight:500; padding:3px 10px; border-radius:6px; }}
+.rtag {{ font-size:12px; font-weight:500; padding:3px 10px; border-radius:6px; display:inline-block; }}
 .rtag.sample {{ background:{SOFT_BG}; color:{ACCENT2}; }}
 .rtag.law {{ background:#F2F4F6; color:#4E5968; }}
 .rtag.mode {{ background:{SOFT_BG}; color:{ACCENT2}; font-weight:700; }}
+.rname {{ font-size:17px; font-weight:700; color:#191F28; }}
 .kpi-grid {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px; }}
-.kpi-card {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:16px 18px; transition:border-color .15s,box-shadow .15s; }}
+.kpi-card {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:16px 18px; text-align:center; transition:border-color .15s,box-shadow .15s; }}
 .kpi-card:hover {{ border-color:{ACCENT}; box-shadow:0 2px 12px rgba(15,42,74,.08); }}
-.kpi-card .kl {{ font-size:12px; color:#8B95A1; font-weight:500; margin-bottom:8px; }}
-.kpi-card .kv {{ font-size:1.7rem; font-weight:900; color:#191F28; line-height:1; letter-spacing:-0.02em; }}
+.kpi-card .kl {{ font-size:12px; color:#8B95A1; font-weight:500; margin-bottom:8px; text-align:center; }}
+.kpi-card .kv {{ font-size:1.7rem; font-weight:900; color:#191F28; line-height:1; letter-spacing:-0.02em; text-align:center; }}
 .kpi-card .kv small {{ font-size:13px; font-weight:500; color:#8B95A1; margin-left:3px; }}
-.kpi-card .kd {{ font-size:11px; margin-top:7px; font-weight:500; }}
+.kpi-card .kd {{ font-size:11px; margin-top:7px; font-weight:500; text-align:center; }}
 .verdict {{ border-radius:12px; padding:16px 20px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }}
 .verdict .vi {{ font-size:26px; }}
 .verdict .vt h4 {{ margin:0; font-size:15px; font-weight:700; }}
@@ -55,9 +59,7 @@ html, body, .stApp {{ font-family:'Noto Sans KR',sans-serif !important; backgrou
 .v-warning {{ background:#FFF4E6; }} .v-warning h4,.v-warning p {{ color:#E8590C; }}
 .sec-title {{ font-size:15px; font-weight:700; color:#191F28; margin:18px 0 12px; display:flex; align-items:center; gap:8px; }}
 .sec-title::before {{ content:''; width:3px; height:15px; background:{ACCENT}; border-radius:2px; }}
-
 [data-testid="stSidebar"] {{ background:#FAFBFC !important; border-right:1px solid #E5E8EB !important; }}
-[data-testid="stSidebar"] * {{ font-family:'Noto Sans KR',sans-serif !important; }}
 .side-h {{ font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }}
 input[type="text"], input[type="number"],
 .stTextInput input, .stNumberInput input,
@@ -71,10 +73,7 @@ input[type="text"], input[type="number"],
 }}
 [data-testid="stNumberInput"] button {{ background:#F2F4F6 !important; color:#191F28 !important; border:1px solid #D1D6DB !important; }}
 [data-testid="stSidebar"] label, [data-testid="stWidgetLabel"] label {{ color:#4E5968 !important; font-weight:500 !important; }}
-[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div,
-[data-testid="stSidebar"] label p, [data-testid="stSidebar"] label div {{
-    color:#191F28 !important; -webkit-text-fill-color:#191F28 !important;
-}}
+[data-testid="stSidebar"] label p, [data-testid="stSidebar"] label div,
 [data-testid="stSidebar"] [role="radiogroup"] label,
 [data-testid="stSidebar"] [data-baseweb="radio"] div {{ color:#191F28 !important; -webkit-text-fill-color:#191F28 !important; }}
 [data-testid="stSidebar"] [data-testid="stTickBar"] div,
@@ -92,18 +91,12 @@ input[type="text"], input[type="number"],
 .bar-track {{ flex:1; height:10px; background:#F2F4F6; border-radius:100px; overflow:hidden; }}
 .bar-fill {{ height:100%; border-radius:100px; }}
 .bar-line .bv {{ font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }}
-
-/* 우측 비주얼 패널 */
-.visual-panel {{ position:relative; border-radius:16px; overflow:hidden; min-height:560px; box-shadow:0 4px 24px rgba(15,42,74,.12); }}
-.visual-cap {{ position:absolute; left:0; bottom:0; right:0; padding:28px 26px; background:linear-gradient(to top, rgba(15,42,74,.82), rgba(15,42,74,0)); }}
-.visual-cap h3 {{ color:#fff; font-size:20px; font-weight:700; margin:0 0 6px; letter-spacing:-0.01em; }}
-.visual-cap p {{ color:rgba(255,255,255,.85); font-size:13px; margin:0; font-weight:400; letter-spacing:0.02em; }}
-.visual-fallback {{ width:100%; min-height:560px; border-radius:16px; background:linear-gradient(135deg,{ACCENT} 0%,{ACCENT2} 100%); display:flex; align-items:flex-end; }}
+.info-box {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:14px 18px; }}
 [data-testid="stImage"] img {{ border-radius:16px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# Supabase
+# Supabase (로직 보존)
 SB_ON, supabase = False, None
 try:
     from supabase import create_client
@@ -118,28 +111,28 @@ except Exception:
 
 PT_LABEL = {"rebuild":"재건축","redevelop":"재개발","small":"소규모정비"}
 
-# ── Basic 수지 엔진 (로직 보존) ───────────────────────
-def calc_business(total_units, member_units, avg_py, m_price, g_price, cc, other_rate, prev):
+# ── Basic 수지 엔진 (㎡ 단위) ─────────────────────────
+def calc_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev):
     general_units = max(total_units-member_units, 0)
-    member_py = member_units*avg_py; general_py = general_units*avg_py; total_py = total_units*avg_py
-    post = (member_py*m_price + general_py*g_price)/10000
-    construct = total_py*cc/10000
+    member_a = member_units*avg_m2; general_a = general_units*avg_m2; total_a = total_units*avg_m2
+    post = (member_a*m_price + general_a*g_price)/10000
+    construct = total_a*cc/10000
     total_cost = construct*(1+other_rate)
     biryul = ((post-total_cost)/prev*100) if prev>0 else 0
     return dict(general_units=general_units, housing=post, shop=0, post=post, construct=construct,
                 base_cost=total_cost, finance=0, total_cost=total_cost, biryul=biryul,
                 profit=post-total_cost-prev, eff_units=total_units)
 
-# ── Advanced 수지 엔진 (로직 보존) ────────────────────
-def calc_advanced_business(total_units, member_units, avg_py, m_price, g_price, cc, other_rate, prev,
-                           donation_rate, shop_area, shop_price, pf_rate, delay_months):
+# ── Advanced 수지 엔진 (㎡ 단위) ──────────────────────
+def calc_advanced_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev,
+                           donation_rate, shop_area_m2, shop_price, pf_rate, delay_months):
     eff_units = round(total_units*(1+donation_rate/100*1.5))
     general_units = max(eff_units-member_units, 0)
-    member_py = member_units*avg_py; general_py = general_units*avg_py; total_py = eff_units*avg_py
-    housing = (member_py*m_price + general_py*g_price)/10000
-    shop = (shop_area*shop_price)/10000
+    member_a = member_units*avg_m2; general_a = general_units*avg_m2; total_a = eff_units*avg_m2
+    housing = (member_a*m_price + general_a*g_price)/10000
+    shop = (shop_area_m2*shop_price)/10000
     post = housing + shop
-    construct = total_py*cc/10000
+    construct = total_a*cc/10000
     base_cost = construct*(1+other_rate)
     loan = base_cost*0.6
     months = 24 + delay_months
@@ -150,6 +143,7 @@ def calc_advanced_business(total_units, member_units, avg_py, m_price, g_price, 
                 construct=construct, base_cost=base_cost, finance=finance, total_cost=total_cost,
                 biryul=biryul, profit=post-total_cost-prev, eff_units=eff_units)
 
+# ── 법정요건 (소규모정비 4유형 세분화) ─────────────────
 def calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units):
     reqs, score, sd = [], None, ""
     if pt=="rebuild":
@@ -163,11 +157,21 @@ def calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units):
         sl=5 if lot>=40 else 4 if lot>=30 else 3 if lot>=20 else 2
         score=sa+so+sl+10
         reqs=[("노후2/3",oo),("면적1만㎡",ar),(f"정비지수{round(score)}",score>=60)]; okv=oo and ar; sd=f"{round(score)}/100"
-    else:
-        ar=area<10000; oo=oldr>=66.7; uo=total_units<200 if stype=="소규모재건축" else True
-        reqs=[("면적1만㎡미만",ar),("노후2/3",oo)]
-        if stype=="소규모재건축": reqs.append(("200세대미만",uo))
-        okv=ar and oo and uo; sd="적합" if okv else "미달"
+    else:  # 소규모정비 (빈집 및 소규모주택 정비에 관한 특례법)
+        oo = oldr>=66.7
+        if stype=="가로주택정비":
+            ar = area<10000
+            reqs=[("면적1만㎡미만",ar),("노후2/3",oo)]; okv=ar and oo
+        elif stype=="자율주택정비":
+            uo = total_units<20  # 단독·다세대 밀집, 소규모 세대 기준
+            reqs=[("20세대미만",uo),("노후2/3",oo)]; okv=uo and oo
+        elif stype=="소규모재건축":
+            ar = area<10000; uo = total_units<200
+            reqs=[("면적1만㎡미만",ar),("200세대미만",uo),("노후2/3",oo)]; okv=ar and uo and oo
+        else:  # 소규모재개발
+            ar = area<5000  # 역세권·준공업 5천㎡ 미만
+            reqs=[("면적5천㎡미만",ar),("노후2/3",oo)]; okv=ar and oo
+        sd="적합" if okv else "미달"
     return reqs, okv, sd, score
 
 def verdict(b, okv):
@@ -201,7 +205,7 @@ with st.sidebar:
 
     st.markdown('<div class="side-h">🏘️ 구역 요건</div>', unsafe_allow_html=True)
     area = st.number_input("구역면적 (㎡)", 0, value=35000, step=1000)
-    year, diag, oldr, lot, stype = 1992, "통과(D/E)", 75.0, 30.0, "가로주택"
+    year, diag, oldr, lot, stype = 1992, "통과(D/E)", 75.0, 30.0, "가로주택정비"
     if pt=="rebuild":
         diag = st.radio("안전진단", ["통과(D/E)","미통과"], horizontal=True)
         year = st.number_input("준공연도", 1960, 2025, 1992)
@@ -210,51 +214,87 @@ with st.sidebar:
         oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, 75.0)
         lot = st.slider("과소필지율 (%)", 0.0, 60.0, 30.0)
     else:
-        stype = st.radio("세부유형", ["가로주택","소규모재건축"], horizontal=True)
+        stype = st.radio("세부유형", ["가로주택정비","자율주택정비","소규모재건축","소규모재개발"])
         oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, 70.0)
-        st.caption("가로주택: 1만㎡ 미만 · 안전진단 면제" if stype=="가로주택" else "소규모재건축: 1만㎡·200세대 미만 + 안전진단")
+        _hint = {
+            "가로주택정비":"가로주택: 1만㎡ 미만 · 노후 2/3 이상 · 안전진단 면제",
+            "자율주택정비":"자율주택: 단독·다세대 밀집 · 20세대 미만 소규모",
+            "소규모재건축":"소규모재건축: 1만㎡·200세대 미만 · 안전진단",
+            "소규모재개발":"소규모재개발: 역세권·준공업 5천㎡ 미만",
+        }
+        st.caption(_hint[stype])
     agree = st.slider("주민동의율 (%)", 50.0, 100.0, 75.0)
 
     st.markdown('<div class="side-h">🏢 분양 계획</div>', unsafe_allow_html=True)
     total_units = st.number_input("신축 총세대", 1, value=600, step=10)
     member_units = st.number_input("조합원 분양세대", 0, value=350, step=10, help="나머지가 일반분양분")
-    avg_py = st.number_input("세대당 분양면적 (평)", 10, 60, 25)
+    avg_m2 = st.number_input("세대당 분양면적 (㎡)", 30, 200, 85, help="전용 84㎡ ≈ 국민주택규모")
 
     st.markdown('<div class="side-h">💰 사업성 입력</div>', unsafe_allow_html=True)
     prev = st.number_input("종전자산 총액 (억)", 0, value=2000, step=100, help="조합원 보유 토지·건물 감정가 합계")
-    g_price = st.slider("일반분양가 (만원/평)", 1500, 5000, 2800, step=50)
-    m_price = st.slider("조합원분양가 (만원/평)", 1500, 5000, 2500, step=50)
-    cc = st.slider("공사비 (만원/평)", 400, 900, 650, step=10)
-    other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50, 28 if pt=="small" else 35)/100
+    g_price = st.number_input("일반분양가 (만원/㎡)", 0, value=850, step=10)
+    m_price = st.number_input("조합원분양가 (만원/㎡)", 0, value=760, step=10)
+    cc = st.number_input("공사비 (만원/㎡)", 0, value=200, step=5)
+    other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50, 28 if pt=="small" else 35,
+                           help="공사비를 제외한 사업 부대비용의 비율 (설계·감리비, 각종 부담금, 신탁보수, 예비비 등 포함. PF 금융비용은 별도 계산)")/100
 
     if ADV:
         st.markdown('<div class="side-h">🎯 인센티브 · 상가 · 금융 (Advanced)</div>', unsafe_allow_html=True)
         donation_rate = st.slider("기부채납률 (%)", 0, 20, 10, help="높을수록 용적률 인센티브로 세대수 증가")
-        shop_area = st.slider("상가 연면적 (평)", 0, 3000, 500, step=50)
-        shop_price = st.slider("상가 평당 분양가 (만원)", 2000, 8000, 4000, step=100)
-        pf_rate = st.slider("예상 PF 금리 (%)", 4.0, 15.0, 8.0, step=0.1)
+        shop_area = st.number_input("상가 연면적 (㎡)", 0, value=1650, step=50)
+        shop_price = st.number_input("상가 분양가 (만원/㎡)", 0, value=1200, step=50)
+        pf_rate = st.number_input("예상 PF 금리 (%)", 0.0, value=8.0, step=0.1)
         delay_months = st.slider("사업 지연 기간 (개월)", 0, 36, 0)
 
 # ── 계산 (로직 보존) ──────────────────────────────────
 if ADV:
-    biz = calc_advanced_business(total_units, member_units, avg_py, m_price, g_price, cc, other_rate, prev,
+    biz = calc_advanced_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev,
                                  donation_rate, shop_area, shop_price, pf_rate, delay_months)
 else:
-    biz = calc_business(total_units, member_units, avg_py, m_price, g_price, cc, other_rate, prev)
+    biz = calc_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev)
 reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units)
 vk, vi, vt, vd = verdict(biz["biryul"], okv)
-
 law = "빈집·소규모주택 정비 특례법" if pt=="small" else "도시 및 주거환경정비법"
-st.markdown(f"""
-<div class="region-bar">
-  <span class="rtag sample">예시 데이터</span>
-  <span class="rname">{region_name}</span>
-  <span class="rtag law">{PT_LABEL[pt]} · {law}</span>
-  <span class="rtag mode">{'ADVANCED' if ADV else 'BASIC'}</span>
-</div>
-""", unsafe_allow_html=True)
 
-# ── Split-screen 레이아웃 ─────────────────────────────
+# ── 구역 정보 바 + 저장 버튼 ──────────────────────────
+with st.container():
+    rb1, rb2 = st.columns([7, 3], vertical_alignment="center")
+    with rb1:
+        st.markdown(f"""
+        <div class="info-box" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span class="rtag sample">예시 데이터</span>
+          <span class="rname">{region_name}</span>
+          <span class="rtag law">{PT_LABEL[pt]} · {law}</span>
+          <span class="rtag mode">{'ADVANCED' if ADV else 'BASIC'}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with rb2:
+        save_clicked = st.button("💾 이 분석 저장", use_container_width=True, disabled=not SB_ON)
+
+if save_clicked:
+    note = None
+    if ADV:
+        note = f"ADV|기부{donation_rate}%|상가{shop_area}㎡|PF{pf_rate}%|지연{delay_months}M|금융{biz['finance']:.0f}억"
+    row = dict(region_name=region_name, project_type=pt,
+               small_type=stype if pt=="small" else None,
+               area_sqm=area, built_year=year if pt=="rebuild" else None,
+               diagnosis=diag if pt=="rebuild" else None, old_ratio=oldr,
+               small_lot=lot, agree_ratio=agree, units=biz["eff_units"], prev_asset=prev,
+               sale_price=g_price, construct_cost=cc,
+               gen_ratio=round(biz["general_units"]/max(biz["eff_units"],1)*100,1),
+               biryul=round(biz["biryul"],2), total_cost=round(biz["total_cost"],1),
+               profit=round(biz["profit"],1),
+               jeongbi_score=round(score,1) if score is not None else None,
+               verdict=vt, req_pass=okv, note=note)
+    try:
+        r = supabase.table("analysis_regions").insert(row).execute()
+        st.success(f"저장 완료 (id: {r.data[0]['id']})")
+    except Exception as e:
+        st.error(f"저장 실패: {e}")
+
+st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+# ── Split-screen ──────────────────────────────────────
 left, right = st.columns([4.5, 5.5], gap="large")
 
 with left:
@@ -291,60 +331,36 @@ with left:
     st.markdown(f'<div class="struct">{bars}</div>', unsafe_allow_html=True)
     st.caption("비례율 = (종후자산 − 총사업비) ÷ 종전자산 × 100 · 실무 표준 공식" + (" · 총사업비에 PF 금융비용 포함" if ADV else ""))
 
-    # 저장/조회 (로직 보존)
-    st.markdown('<div class="sec-title">분석 결과 저장</div>', unsafe_allow_html=True)
-    st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
-    cs1, cs2 = st.columns(2)
-    with cs1:
-        if st.button("💾 이 분석 저장", use_container_width=True, disabled=not SB_ON):
-            note = None
-            if ADV:
-                note = f"ADV|기부{donation_rate}%|상가{shop_area}평|PF{pf_rate}%|지연{delay_months}M|금융{biz['finance']:.0f}억"
-            row = dict(region_name=region_name, project_type=pt,
-                       small_type=stype if pt=="small" else None,
-                       area_sqm=area, built_year=year if pt=="rebuild" else None,
-                       diagnosis=diag if pt=="rebuild" else None, old_ratio=oldr,
-                       small_lot=lot, agree_ratio=agree, units=biz["eff_units"], prev_asset=prev,
-                       sale_price=g_price, construct_cost=cc,
-                       gen_ratio=round(biz["general_units"]/max(biz["eff_units"],1)*100,1),
-                       biryul=round(biz["biryul"],2), total_cost=round(biz["total_cost"],1),
-                       profit=round(biz["profit"],1),
-                       jeongbi_score=round(score,1) if score is not None else None,
-                       verdict=vt, req_pass=okv, note=note)
-            try:
-                r = supabase.table("analysis_regions").insert(row).execute()
-                st.success(f"저장 완료 (id: {r.data[0]['id']})")
-            except Exception as e:
-                st.error(f"저장 실패: {e}")
-    with cs2:
-        if st.button("📊 누적 데이터 보기", use_container_width=True, disabled=not SB_ON):
-            try:
-                r = supabase.table("analysis_regions").select(
-                    "created_at,region_name,project_type,biryul,profit,verdict"
-                ).order("created_at", desc=True).limit(50).execute()
-                if r.data:
-                    df = pd.DataFrame(r.data)
-                    df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
-                    df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
-                    df.columns = ["분석일자","구역명","유형","비례율(%)","사업이익(억)","판정"]
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                else:
-                    st.info("저장된 데이터가 없습니다.")
-            except Exception as e:
-                st.error(f"조회 실패: {e}")
-    st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
-
 with right:
-    img_url = "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
-    st.markdown('<div style="position:relative;">', unsafe_allow_html=True)
+    img_url = "https://images.unsplash.com/photo-1554469384-e58fac16e23a?q=80&w=2000&auto=format&fit=crop"
     try:
         st.image(img_url, use_container_width=True)
     except Exception:
-        st.markdown('<div class="visual-fallback"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="width:100%;min-height:540px;border-radius:16px;background:linear-gradient(135deg,{ACCENT} 0%,{ACCENT2} 100%);"></div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div style="margin-top:-7px; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
       <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">Professional Feasibility Analysis</h3>
       <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">For Real Estate Developers &amp; Consultants</p>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── 누적 데이터 (Full-width 엑셀 시트) ────────────────
+st.markdown('<div class="sec-title">누적 분석 데이터</div>', unsafe_allow_html=True)
+st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
+if st.button("📊 누적 데이터 보기", use_container_width=True, disabled=not SB_ON):
+    try:
+        r = supabase.table("analysis_regions").select(
+            "created_at,region_name,project_type,biryul,total_cost,profit,verdict"
+        ).order("created_at", desc=True).limit(100).execute()
+        if r.data:
+            df = pd.DataFrame(r.data)
+            df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
+            df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
+            st.dataframe(df, use_container_width=True, height=440, hide_index=True)
+        else:
+            st.info("저장된 데이터가 없습니다.")
+    except Exception as e:
+        st.error(f"조회 실패: {e}")
+
+st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
