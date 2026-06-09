@@ -92,6 +92,8 @@ input[type="text"], input[type="number"],
 .bar-fill {{ height:100%; border-radius:100px; }}
 .bar-line .bv {{ font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }}
 .info-box {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:14px 18px; }}
+/* 헤더에 붙는 풀폭 구역정보 바 */
+.region-strip {{ background:#fff; border-bottom:1px solid #E5E8EB; margin:0 -2rem 18px; padding:10px 2rem; }}
 [data-testid="stImage"] img {{ border-radius:16px; }}
 /* 아웃라인 저장 버튼 (구역정보 행 우측) */
 .save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
@@ -260,8 +262,8 @@ reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, t
 vk, vi, vt, vd = verdict(biz["biryul"], okv)
 law = "빈집·소규모주택 정비 특례법" if pt=="small" else "도시 및 주거환경정비법"
 
-# ── 구역 정보 바 + 저장 버튼 (흰 컨테이너 한 행) ──────
-st.markdown('<div class="info-box" style="padding:10px 14px;">', unsafe_allow_html=True)
+# ── 구역 정보 바 (헤더에 붙는 풀폭 흰 바) + 저장 버튼 ──
+st.markdown('<div class="region-strip">', unsafe_allow_html=True)
 rb1, rb2 = st.columns([7, 3], vertical_alignment="center")
 with rb1:
     st.markdown(f"""
