@@ -93,6 +93,10 @@ input[type="text"], input[type="number"],
 .bar-line .bv {{ font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }}
 .info-box {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:14px 18px; }}
 [data-testid="stImage"] img {{ border-radius:16px; }}
+/* 아웃라인 저장 버튼 (구역정보 행 우측) */
+.save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
+.save-slot button:hover {{ background:{SOFT_BG} !important; color:{ACCENT2} !important; filter:none !important; }}
+.save-slot button:disabled {{ background:#fff !important; color:#B0B8C1 !important; border-color:#D1D6DB !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -256,20 +260,23 @@ reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, t
 vk, vi, vt, vd = verdict(biz["biryul"], okv)
 law = "빈집·소규모주택 정비 특례법" if pt=="small" else "도시 및 주거환경정비법"
 
-# ── 구역 정보 바 + 저장 버튼 ──────────────────────────
-with st.container():
-    rb1, rb2 = st.columns([7, 3], vertical_alignment="center")
-    with rb1:
-        st.markdown(f"""
-        <div class="info-box" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <span class="rtag sample">예시 데이터</span>
-          <span class="rname">{region_name}</span>
-          <span class="rtag law">{PT_LABEL[pt]} · {law}</span>
-          <span class="rtag mode">{'ADVANCED' if ADV else 'BASIC'}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with rb2:
-        save_clicked = st.button("💾 이 분석 저장", use_container_width=True, disabled=not SB_ON)
+# ── 구역 정보 바 + 저장 버튼 (흰 컨테이너 한 행) ──────
+st.markdown('<div class="info-box" style="padding:10px 14px;">', unsafe_allow_html=True)
+rb1, rb2 = st.columns([7, 3], vertical_alignment="center")
+with rb1:
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:4px;">
+      <span class="rtag sample">예시 데이터</span>
+      <span class="rname">{region_name}</span>
+      <span class="rtag law">{PT_LABEL[pt]} · {law}</span>
+      <span class="rtag mode">{'ADVANCED' if ADV else 'BASIC'}</span>
+    </div>
+    """, unsafe_allow_html=True)
+with rb2:
+    st.markdown('<div class="save-slot">', unsafe_allow_html=True)
+    save_clicked = st.button("💾 이 분석 저장", use_container_width=True, disabled=not SB_ON)
+    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 if save_clicked:
     note = None
@@ -331,6 +338,25 @@ with left:
     st.markdown(f'<div class="struct">{bars}</div>', unsafe_allow_html=True)
     st.caption("비례율 = (종후자산 − 총사업비) ÷ 종전자산 × 100 · 실무 표준 공식" + (" · 총사업비에 PF 금융비용 포함" if ADV else ""))
 
+    # 누적 데이터 (좌측 패널 하단)
+    st.markdown('<div class="sec-title">누적 분석 데이터</div>', unsafe_allow_html=True)
+    st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
+    if st.button("📊 누적 데이터 보기", use_container_width=True, disabled=not SB_ON):
+        try:
+            r = supabase.table("analysis_regions").select(
+                "created_at,region_name,project_type,biryul,total_cost,profit,verdict"
+            ).order("created_at", desc=True).limit(100).execute()
+            if r.data:
+                df = pd.DataFrame(r.data)
+                df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
+                df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
+                df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
+                st.dataframe(df, use_container_width=True, height=440, hide_index=True)
+            else:
+                st.info("저장된 데이터가 없습니다.")
+        except Exception as e:
+            st.error(f"조회 실패: {e}")
+
 with right:
     img_url = "https://images.unsplash.com/photo-1554469384-e58fac16e23a?q=80&w=2000&auto=format&fit=crop"
     try:
@@ -343,24 +369,5 @@ with right:
       <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">For Real Estate Developers &amp; Consultants</p>
     </div>
     """, unsafe_allow_html=True)
-
-# ── 누적 데이터 (Full-width 엑셀 시트) ────────────────
-st.markdown('<div class="sec-title">누적 분석 데이터</div>', unsafe_allow_html=True)
-st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
-if st.button("📊 누적 데이터 보기", use_container_width=True, disabled=not SB_ON):
-    try:
-        r = supabase.table("analysis_regions").select(
-            "created_at,region_name,project_type,biryul,total_cost,profit,verdict"
-        ).order("created_at", desc=True).limit(100).execute()
-        if r.data:
-            df = pd.DataFrame(r.data)
-            df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
-            df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
-            st.dataframe(df, use_container_width=True, height=440, hide_index=True)
-        else:
-            st.info("저장된 데이터가 없습니다.")
-    except Exception as e:
-        st.error(f"조회 실패: {e}")
 
 st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
