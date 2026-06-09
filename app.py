@@ -95,6 +95,14 @@ input[type="text"], input[type="number"],
 /* 헤더에 붙는 풀폭 구역정보 바 */
 .region-strip {{ background:#fff; border-bottom:1px solid #E5E8EB; margin:0 -2rem 18px; padding:10px 2rem; }}
 [data-testid="stImage"] img {{ border-radius:16px; }}
+/* 누적 데이터 표: 흰 바탕 + 검은 글씨 강제 */
+.excel-sheet [data-testid="stDataFrame"], .excel-sheet [data-testid="stDataFrame"] * {{
+    background-color:#FFFFFF !important; color:#191F28 !important; -webkit-text-fill-color:#191F28 !important;
+}}
+.excel-sheet [data-testid="stDataFrame"] [role="columnheader"] {{
+    background-color:#F2F4F6 !important; color:#191F28 !important; font-weight:700 !important;
+}}
+.excel-sheet [data-testid="stDataFrame"] [role="gridcell"] {{ border-color:#E5E8EB !important; }}
 /* 아웃라인 저장 버튼 (구역정보 행 우측) */
 .save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
 .save-slot button:hover {{ background:{SOFT_BG} !important; color:{ACCENT2} !important; filter:none !important; }}
@@ -340,10 +348,10 @@ with left:
     st.markdown(f'<div class="struct">{bars}</div>', unsafe_allow_html=True)
     st.caption("비례율 = (종후자산 − 총사업비) ÷ 종전자산 × 100 · 실무 표준 공식" + (" · 총사업비에 PF 금융비용 포함" if ADV else ""))
 
-    # 누적 데이터 (좌측 패널 하단)
+    # 누적 데이터 (좌측 패널 하단 · 항상 펼침)
     st.markdown('<div class="sec-title">누적 분석 데이터</div>', unsafe_allow_html=True)
     st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
-    if st.button("📊 누적 데이터 보기", use_container_width=True, disabled=not SB_ON):
+    if SB_ON:
         try:
             r = supabase.table("analysis_regions").select(
                 "created_at,region_name,project_type,biryul,total_cost,profit,verdict"
@@ -353,11 +361,15 @@ with left:
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
                 df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
                 df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
+                st.markdown('<div class="excel-sheet">', unsafe_allow_html=True)
                 st.dataframe(df, use_container_width=True, height=440, hide_index=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.info("저장된 데이터가 없습니다.")
         except Exception as e:
             st.error(f"조회 실패: {e}")
+    else:
+        st.info("연결 설정 시 누적 데이터가 표시됩니다.")
 
 with right:
     img_url = "https://images.unsplash.com/photo-1554469384-e58fac16e23a?q=80&w=2000&auto=format&fit=crop"
