@@ -95,14 +95,8 @@ input[type="text"], input[type="number"],
 /* 헤더에 붙는 풀폭 구역정보 바 */
 .region-strip {{ background:#fff; border-bottom:1px solid #E5E8EB; margin:0 -2rem 18px; padding:10px 2rem; }}
 [data-testid="stImage"] img {{ border-radius:16px; }}
-/* 누적 데이터 표: 흰 바탕 + 검은 글씨 강제 */
-.excel-sheet [data-testid="stDataFrame"], .excel-sheet [data-testid="stDataFrame"] * {{
-    background-color:#FFFFFF !important; color:#191F28 !important; -webkit-text-fill-color:#191F28 !important;
-}}
-.excel-sheet [data-testid="stDataFrame"] [role="columnheader"] {{
-    background-color:#F2F4F6 !important; color:#191F28 !important; font-weight:700 !important;
-}}
-.excel-sheet [data-testid="stDataFrame"] [role="gridcell"] {{ border-color:#E5E8EB !important; }}
+/* 누적 데이터 표 격자선 */
+[data-testid="stDataFrame"] {{ border:1px solid #C9CDD2 !important; }}
 /* 아웃라인 저장 버튼 (구역정보 행 우측) */
 .save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
 .save-slot button:hover {{ background:{SOFT_BG} !important; color:{ACCENT2} !important; filter:none !important; }}
@@ -361,16 +355,7 @@ with left:
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
                 df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
                 df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
-                sty = df.style.set_properties(**{
-                    "background-color": "#FFFFFF", "color": "#000000",
-                    "border": "1px solid #000000"
-                }).set_table_styles([
-                    {"selector": "th", "props": [("background-color", "#FFFFFF"),
-                                                  ("color", "#000000"), ("font-weight", "700"),
-                                                  ("border", "1px solid #000000")]},
-                    {"selector": "td", "props": [("border", "1px solid #000000")]}
-                ])
-                st.dataframe(sty, use_container_width=True, height=440, hide_index=True)
+                st.dataframe(df, use_container_width=True, height=440, hide_index=True)
             else:
                 st.info("저장된 데이터가 없습니다.")
         except Exception as e:
