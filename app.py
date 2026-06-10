@@ -1,6 +1,6 @@
 """
 정비사업 수주 타당성 분석 플랫폼
-시행사 사업개발팀용 · Basic / Advanced 2-모드 · ㎡ 단위 · Navy & Blue · Split-screen
+시행사 사업개발팀용 · Basic / Advanced 2-모드 · 결과기반 동적 테마(Dynamic Theming)
 """
 import streamlit as st
 import pandas as pd
@@ -10,110 +10,9 @@ st.set_page_config(page_title="정비사업 수주 타당성 분석", page_icon=
                    layout="wide", initial_sidebar_state="expanded")
 
 if "mode" not in st.session_state:
-    st.session_state.mode = "basic"
-
+    st.session_state.mode = "advanced" if False else "basic"
 ADV = st.session_state.mode == "advanced"
-ACCENT = "#0F2A4A" if ADV else "#1B64DA"
-ACCENT2 = "#1E3A8A" if ADV else "#1B64DA"
-HEAD_BG = "#0F2A4A" if ADV else "#1B64DA"
-SOFT_BG = "#EAF0F8" if ADV else "#E8F1FF"
 
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
-/* 본문 텍스트에만 한글 폰트 적용 (아이콘 span은 건드리지 않음) */
-html, body, .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3,
-.stApp h4, .stApp label, .stApp input, .stApp button, .stApp td, .stApp th,
-.stApp li, .stApp a {{
-    font-family:'Noto Sans KR',sans-serif;
-}}
-.stApp {{ background:#F4F6F9 !important; color:#1A1A1A !important; }}
-/* 아이콘 폰트는 절대 덮어쓰지 않음 - Streamlit 기본값 유지 */
-[data-testid="stIconMaterial"], .material-icons, .material-symbols-outlined,
-[data-testid="stIconMaterial"] * {{
-    font-family:'Material Symbols Rounded','Material Symbols Outlined','Material Icons' !important;
-    font-feature-settings:'liga' !important;
-}}
-/* 깨진 아이콘 텍스트가 보이는 최후 안전장치: 토글 버튼 라벨 숨김 폭 제한 */
-[data-testid="stSidebarCollapseButton"] span:not([data-testid="stIconMaterial"]),
-[data-testid="collapsedControl"] span:not([data-testid="stIconMaterial"]) {{
-    font-size:0 !important;
-}}
-#MainMenu, footer {{ display:none !important; }}
-.main .block-container {{ padding:0 2rem 3rem !important; max-width:1600px !important; }}
-.top-header {{ background:{HEAD_BG}; margin:0 -2rem 0; padding:14px 2rem; display:flex; align-items:center; gap:16px; }}
-.top-header .brand {{ font-size:18px; font-weight:900; color:#fff; display:flex; align-items:center; gap:8px; letter-spacing:-0.02em; }}
-.top-header .brand-sub {{ font-size:11px; font-weight:500; color:rgba(255,255,255,.85); padding:2px 9px; background:rgba(255,255,255,.18); border-radius:100px; }}
-.top-header .spacer {{ flex:1; }}
-.top-header .head-link {{ font-size:13px; color:rgba(255,255,255,.92); font-weight:500; }}
-.rtag {{ font-size:12px; font-weight:500; padding:3px 10px; border-radius:6px; display:inline-block; }}
-.rtag.sample {{ background:{SOFT_BG}; color:{ACCENT2}; }}
-.rtag.law {{ background:#F2F4F6; color:#4E5968; }}
-.rtag.mode {{ background:{SOFT_BG}; color:{ACCENT2}; font-weight:700; }}
-.rname {{ font-size:17px; font-weight:700; color:#191F28; }}
-.kpi-grid {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px; }}
-.kpi-card {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:16px 18px; text-align:center; transition:border-color .15s,box-shadow .15s; }}
-.kpi-card:hover {{ border-color:{ACCENT}; box-shadow:0 2px 12px rgba(15,42,74,.08); }}
-.kpi-card .kl {{ font-size:12px; color:#8B95A1; font-weight:500; margin-bottom:8px; text-align:center; }}
-.kpi-card .kv {{ font-size:1.7rem; font-weight:900; color:#191F28; line-height:1; letter-spacing:-0.02em; text-align:center; }}
-.kpi-card .kv small {{ font-size:13px; font-weight:500; color:#8B95A1; margin-left:3px; }}
-.kpi-card .kd {{ font-size:11px; margin-top:7px; font-weight:500; text-align:center; }}
-.verdict {{ border-radius:12px; padding:16px 20px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }}
-.verdict .vi {{ font-size:26px; }}
-.verdict .vt h4 {{ margin:0; font-size:15px; font-weight:700; }}
-.verdict .vt p {{ margin:3px 0 0; font-size:13px; }}
-.v-success {{ background:{SOFT_BG}; }} .v-success h4,.v-success p {{ color:{ACCENT2}; }}
-.v-info {{ background:#E8F1FF; }} .v-info h4,.v-info p {{ color:#1B64DA; }}
-.v-warning {{ background:#FFF4E6; }} .v-warning h4,.v-warning p {{ color:#E8590C; }}
-.sec-title {{ font-size:15px; font-weight:700; color:#191F28; margin:18px 0 12px; display:flex; align-items:center; gap:8px; }}
-.sec-title::before {{ content:''; width:3px; height:15px; background:{ACCENT}; border-radius:2px; }}
-[data-testid="stSidebar"] {{ background:#FAFBFC !important; border-right:1px solid #E5E8EB !important; }}
-[data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div:not([data-testid="stIconMaterial"]) {{
-    font-family:'Noto Sans KR',sans-serif;
-}}
-.side-h {{ font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }}
-input[type="text"], input[type="number"],
-.stTextInput input, .stNumberInput input,
-[data-testid="stSidebar"] input {{
-    background:#F2F4F6 !important; color:#191F28 !important;
-    border:1.5px solid #D1D6DB !important; border-radius:8px !important;
-    font-size:14px !important; -webkit-text-fill-color:#191F28 !important;
-}}
-.stTextInput input:focus, .stNumberInput input:focus {{
-    border-color:{ACCENT} !important; box-shadow:0 0 0 3px rgba(27,100,218,.12) !important;
-}}
-[data-testid="stNumberInput"] button {{ background:#F2F4F6 !important; color:#191F28 !important; border:1px solid #D1D6DB !important; }}
-[data-testid="stSidebar"] label, [data-testid="stWidgetLabel"] label {{ color:#4E5968 !important; font-weight:500 !important; }}
-[data-testid="stSidebar"] label p, [data-testid="stSidebar"] label div,
-[data-testid="stSidebar"] [role="radiogroup"] label,
-[data-testid="stSidebar"] [data-baseweb="radio"] div {{ color:#191F28 !important; -webkit-text-fill-color:#191F28 !important; }}
-[data-testid="stSidebar"] [data-testid="stTickBar"] div,
-[data-testid="stSidebar"] [data-testid="stThumbValue"] {{ color:#4E5968 !important; -webkit-text-fill-color:#4E5968 !important; }}
-.stCaption, [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color:#8B95A1 !important; -webkit-text-fill-color:#8B95A1 !important; }}
-.stButton>button {{ background:{ACCENT} !important; color:#fff !important; border:none !important; border-radius:8px !important; font-weight:700 !important; font-size:14px !important; padding:10px 20px !important; transition:.15s !important; }}
-.stButton>button:hover {{ filter:brightness(1.12); transform:translateY(-1px); }}
-.stButton>button:disabled {{ background:#D1D6DB !important; color:#fff !important; }}
-.chips {{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }}
-.chip {{ font-size:11px; font-weight:500; padding:4px 11px; border-radius:100px; display:inline-flex; align-items:center; gap:4px; }}
-.chip.ok {{ background:{SOFT_BG}; color:{ACCENT2}; }} .chip.no {{ background:#FFF4E6; color:#E8590C; }}
-.struct {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:18px 20px; }}
-.bar-line {{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }}
-.bar-line .bl {{ font-size:13px; color:#4E5968; flex:0 0 90px; font-weight:500; }}
-.bar-track {{ flex:1; height:10px; background:#F2F4F6; border-radius:100px; overflow:hidden; }}
-.bar-fill {{ height:100%; border-radius:100px; }}
-.bar-line .bv {{ font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }}
-.info-box {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:14px 18px; }}
-/* 헤더에 붙는 풀폭 구역정보 바 */
-.region-strip {{ background:#fff; border-bottom:1px solid #E5E8EB; margin:0 -2rem 18px; padding:10px 2rem; }}
-[data-testid="stImage"] img {{ border-radius:16px; }}
-/* 아웃라인 저장 버튼 (구역정보 행 우측) */
-.save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
-.save-slot button:hover {{ background:{SOFT_BG} !important; color:{ACCENT2} !important; filter:none !important; }}
-.save-slot button:disabled {{ background:#fff !important; color:#B0B8C1 !important; border-color:#D1D6DB !important; }}
-</style>
-""", unsafe_allow_html=True)
-
-# Supabase (로직 보존)
 SB_ON, supabase = False, None
 try:
     from supabase import create_client
@@ -127,6 +26,8 @@ except Exception:
     SB_ON = False
 
 PT_LABEL = {"rebuild":"재건축","redevelop":"재개발","small":"소규모정비"}
+
+
 
 # ── Basic 수지 엔진 (㎡ 단위) ─────────────────────────
 def calc_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev):
@@ -196,16 +97,6 @@ def verdict(b, okv):
     if b>=100 and okv: return "info","🔵","사업성 양호 · 조건부 검토","추가 변수 점검 후 추진 가능"
     return "warning","⚠️","사업성 부족 · 재검토 필요","비례율 100% 미만 또는 요건 미달"
 
-# ── 헤더 ──────────────────────────────────────────────
-mode_label = "Advanced · 상세 수지분석" if ADV else "Basic · 초기 스크리닝"
-st.markdown(f"""
-<div class="top-header">
-  <div class="brand">🏗️ 정비사업 수주 타당성 분석<span class="brand-sub">시행사 사업개발팀용</span></div>
-  <div class="spacer"></div>
-  <div class="head-link">{mode_label}</div>
-</div>
-""", unsafe_allow_html=True)
-
 # ── 사이드바 ──────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="side-h">⚙️ 분석 모드</div>', unsafe_allow_html=True)
@@ -263,6 +154,7 @@ with st.sidebar:
         pf_rate = st.number_input("예상 PF 금리 (%)", 0.0, value=8.0, step=0.1)
         delay_months = st.slider("사업 지연 기간 (개월)", 0, 36, 0)
 
+
 # ── 계산 (로직 보존) ──────────────────────────────────
 if ADV:
     biz = calc_advanced_business(total_units, member_units, avg_m2, m_price, g_price, cc, other_rate, prev,
@@ -272,6 +164,120 @@ else:
 reqs, okv, sd, score = calc_req(pt, area, year, diag, oldr, lot, agree, stype, total_units)
 vk, vi, vt, vd = verdict(biz["biryul"], okv)
 law = "빈집·소규모주택 정비 특례법" if pt=="small" else "도시 및 주거환경정비법"
+
+
+# ── 결과 기반 동적 테마 결정 ───────────────────────────
+FIT = (biz["biryul"] >= 100) and okv          # 수주 적합 여부
+if FIT:
+    ACCENT  = "#1B64DA"   # 메인 블루
+    ACCENT2 = "#0F2A4A"   # 보조 네이비
+    SOFT_BG = "#E8F1FF"
+    HEAD_BG = "#1B64DA"
+else:
+    ACCENT  = "#E8590C"   # 메인 앰버
+    ACCENT2 = "#9A3412"   # 보조 다크오렌지
+    SOFT_BG = "#FDF1E7"
+    HEAD_BG = "#C2410C"
+
+# ── CSS (동적 테마 주입) ──────────────────────────────
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+html, body, .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp label, .stApp input, .stApp button, .stApp td, .stApp th,
+.stApp li, .stApp a {{
+    font-family:'Noto Sans KR',sans-serif;
+}}
+.stApp {{ background:#F4F6F9 !important; color:#1A1A1A !important; }}
+[data-testid="stIconMaterial"], .material-icons, .material-symbols-outlined,
+[data-testid="stIconMaterial"] * {{
+    font-family:'Material Symbols Rounded','Material Symbols Outlined','Material Icons' !important;
+    font-feature-settings:'liga' !important;
+}}
+[data-testid="stSidebarCollapseButton"] span:not([data-testid="stIconMaterial"]),
+[data-testid="collapsedControl"] span:not([data-testid="stIconMaterial"]) {{
+    font-size:0 !important;
+}}
+#MainMenu, footer {{ display:none !important; }}
+.main .block-container {{ padding:0 2rem 3rem !important; max-width:1600px !important; }}
+.top-header {{ background:{HEAD_BG}; margin:0 -2rem 0; padding:14px 2rem; display:flex; align-items:center; gap:16px; }}
+.top-header .brand {{ font-size:18px; font-weight:900; color:#fff; display:flex; align-items:center; gap:8px; letter-spacing:-0.02em; }}
+.top-header .brand-sub {{ font-size:11px; font-weight:500; color:rgba(255,255,255,.85); padding:2px 9px; background:rgba(255,255,255,.18); border-radius:100px; }}
+.top-header .spacer {{ flex:1; }}
+.top-header .head-link {{ font-size:13px; color:rgba(255,255,255,.92); font-weight:500; }}
+.rtag {{ font-size:12px; font-weight:500; padding:3px 10px; border-radius:6px; display:inline-block; }}
+.rtag.sample {{ background:{SOFT_BG}; color:{ACCENT2}; }}
+.rtag.law {{ background:#F2F4F6; color:#4E5968; }}
+.rtag.mode {{ background:{SOFT_BG}; color:{ACCENT2}; font-weight:700; }}
+.rname {{ font-size:17px; font-weight:700; color:#191F28; }}
+.region-strip {{ background:#fff; border-bottom:1px solid #E5E8EB; margin:0 -2rem 18px; padding:10px 2rem; }}
+[data-testid="stImage"] img {{ border-radius:16px; }}
+.save-slot button {{ background:#fff !important; color:{ACCENT} !important; border:1.5px solid {ACCENT} !important; font-weight:700 !important; }}
+.save-slot button:hover {{ background:{SOFT_BG} !important; color:{ACCENT2} !important; filter:none !important; }}
+.save-slot button:disabled {{ background:#fff !important; color:#B0B8C1 !important; border-color:#D1D6DB !important; }}
+.kpi-grid {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px; }}
+.kpi-card {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:16px 18px; text-align:center; transition:border-color .15s,box-shadow .15s; }}
+.kpi-card:hover {{ border-color:{ACCENT}; box-shadow:0 2px 12px {ACCENT}22; }}
+.kpi-card .kl {{ font-size:12px; color:#8B95A1; font-weight:500; margin-bottom:8px; text-align:center; }}
+.kpi-card .kv {{ font-size:1.7rem; font-weight:900; color:#191F28; line-height:1; letter-spacing:-0.02em; text-align:center; }}
+.kpi-card .kv small {{ font-size:13px; font-weight:500; color:#8B95A1; margin-left:3px; }}
+.kpi-card .kd {{ font-size:11px; margin-top:7px; font-weight:500; text-align:center; }}
+[data-testid="stSidebar"] {{ background:#FAFBFC !important; border-right:1px solid #E5E8EB !important; }}
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div:not([data-testid="stIconMaterial"]) {{
+    font-family:'Noto Sans KR',sans-serif;
+}}
+.side-h {{ font-size:13px; font-weight:700; color:#191F28; margin:6px 0 2px; }}
+input[type="text"], input[type="number"],
+.stTextInput input, .stNumberInput input,
+[data-testid="stSidebar"] input {{
+    background:#F2F4F6 !important; color:#191F28 !important;
+    border:1.5px solid #D1D6DB !important; border-radius:8px !important;
+    font-size:14px !important; -webkit-text-fill-color:#191F28 !important;
+}}
+.stTextInput input:focus, .stNumberInput input:focus {{
+    border-color:{ACCENT} !important; box-shadow:0 0 0 3px {ACCENT}22 !important;
+}}
+[data-testid="stNumberInput"] button {{ background:#F2F4F6 !important; color:#191F28 !important; border:1px solid #D1D6DB !important; }}
+[data-testid="stSidebar"] label, [data-testid="stWidgetLabel"] label {{ color:#4E5968 !important; font-weight:500 !important; }}
+[data-testid="stSidebar"] label p, [data-testid="stSidebar"] label div,
+[data-testid="stSidebar"] [role="radiogroup"] label,
+[data-testid="stSidebar"] [data-baseweb="radio"] div {{ color:#191F28 !important; -webkit-text-fill-color:#191F28 !important; }}
+[data-testid="stSidebar"] [data-testid="stTickBar"] div,
+[data-testid="stSidebar"] [data-testid="stThumbValue"] {{ color:#4E5968 !important; -webkit-text-fill-color:#4E5968 !important; }}
+.stCaption, [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color:#8B95A1 !important; -webkit-text-fill-color:#8B95A1 !important; }}
+.stButton>button {{ background:{ACCENT} !important; color:#fff !important; border:none !important; border-radius:8px !important; font-weight:700 !important; font-size:14px !important; padding:10px 20px !important; transition:.15s !important; }}
+.stButton>button:hover {{ filter:brightness(1.12); transform:translateY(-1px); }}
+.stButton>button:disabled {{ background:#D1D6DB !important; color:#fff !important; }}
+.chips {{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }}
+.chip {{ font-size:11px; font-weight:500; padding:4px 11px; border-radius:100px; display:inline-flex; align-items:center; gap:4px; }}
+.chip.ok {{ background:{SOFT_BG}; color:{ACCENT2}; }} .chip.no {{ background:#FFF4E6; color:#E8590C; }}
+.struct {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:18px 20px; }}
+.bar-line {{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }}
+.bar-line .bl {{ font-size:13px; color:#4E5968; flex:0 0 90px; font-weight:500; }}
+.bar-track {{ flex:1; height:10px; background:#F2F4F6; border-radius:100px; overflow:hidden; }}
+.bar-fill {{ height:100%; border-radius:100px; }}
+.bar-line .bv {{ font-size:13px; font-weight:700; color:#191F28; flex:0 0 90px; text-align:right; }}
+.verdict {{ border-radius:12px; padding:16px 20px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }}
+.verdict .vi {{ font-size:26px; }}
+.verdict .vt h4 {{ margin:0; font-size:15px; font-weight:700; }}
+.verdict .vt p {{ margin:3px 0 0; font-size:13px; }}
+.v-success {{ background:{SOFT_BG}; }} .v-success h4,.v-success p {{ color:{ACCENT2}; }}
+.v-info {{ background:#E8F1FF; }} .v-info h4,.v-info p {{ color:#1B64DA; }}
+.v-warning {{ background:#FDF1E7; }} .v-warning h4,.v-warning p {{ color:#9A3412; }}
+.sec-title {{ font-size:15px; font-weight:700; color:#191F28; margin:18px 0 12px; display:flex; align-items:center; gap:8px; }}
+.sec-title::before {{ content:''; width:3px; height:15px; background:{ACCENT}; border-radius:2px; }}
+.info-box {{ background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:14px 18px; }}
+</style>
+""", unsafe_allow_html=True)
+
+mode_label = "Advanced · 상세 수지분석" if ADV else "Basic · 초기 스크리닝"
+st.markdown(f"""
+<div class="top-header">
+  <div class="brand">🏗️ 정비사업 수주 타당성 분석<span class="brand-sub">시행사 사업개발팀용</span></div>
+  <div class="spacer"></div>
+  <div class="head-link">{mode_label}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── 구역 정보 바 (헤더에 붙는 풀폭 흰 바) + 저장 버튼 ──
 st.markdown('<div class="region-strip">', unsafe_allow_html=True)
@@ -313,6 +319,7 @@ if save_clicked:
         st.error(f"저장 실패: {e}")
 
 st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
 
 # ── Split-screen ──────────────────────────────────────
 left, right = st.columns([4.5, 5.5], gap="large")
