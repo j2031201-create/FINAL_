@@ -8,17 +8,21 @@ import datetime as dt
 import requests, json
 
 # ── Gemini API 공통 호출 함수 ──────────────────────────
-def call_gemini(prompt: str, max_tokens: int = 1000) -> str:
+def call_gemini(prompt: str, max_tokens: int = 2048) -> str:
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if not api_key:
         return "⚠️ Gemini API 키가 설정되지 않았습니다. Streamlit secrets에 GEMINI_API_KEY를 입력하세요."
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     body = {"contents":[{"parts":[{"text": prompt}]}],
-            "generationConfig":{"maxOutputTokens": max_tokens, "temperature": 0.7}}
+            "generationConfig":{"maxOutputTokens": max_tokens, "temperature": 0.7,
+                                "thinkingConfig":{"thinkingBudget": 0}}}
     try:
-        r = requests.post(url, json=body, timeout=20)
+        r = requests.post(url, json=body, timeout=25)
         r.raise_for_status()
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        cand = r.json()["candidates"][0]
+        parts = cand.get("content",{}).get("parts",[])
+        text = "".join(p.get("text","") for p in parts)
+        return text.strip() if text.strip() else "⚠️ AI 응답이 비어 있습니다. 다시 시도해주세요."
     except Exception as e:
         return f"⚠️ AI 응답 오류: {str(e)[:80]}"
 
@@ -425,7 +429,7 @@ with left:
 5. 추천 전략: 사업 추진 시 핵심 전략 2~3문장
 6. 최종 의견: 수주사 입장에서의 종합 판단 2문장"""
         with st.spinner("🤖 AI 컨설턴트 분석 중..."):
-            result = call_gemini(prompt, 800)
+            result = call_gemini(prompt, 2048)
         st.markdown(f"""<div style="background:#F5F8FF;border:1.5px solid #1B64DA;border-radius:12px;
             padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
             <b style="color:#1B64DA;">🤖 AI 사업성 컨설턴트 의견</b><br><br>{result}</div>""",
@@ -445,7 +449,7 @@ with left:
 3. 민감도 분석: 비례율·분양가·공사비 변동 시 사업성 영향 2~3문장
 4. 대응 전략: 각 리스크별 대응 방안 2~3문장"""
         with st.spinner("⚠️ 리스크 분석 중..."):
-            result = call_gemini(prompt, 700)
+            result = call_gemini(prompt, 2048)
         st.markdown(f"""<div style="background:#FFF8F0;border:1.5px solid #E8590C;border-radius:12px;
             padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
             <b style="color:#E8590C;">⚠️ AI 리스크 분석 결과</b><br><br>{result}</div>""",
@@ -478,7 +482,7 @@ with left:
 ## 6. 최종 권고안
 (수주 여부 최종 권고 및 조건 2~3문장)"""
         with st.spinner("📄 AI 보고서 생성 중..."):
-            result = call_gemini(prompt, 1200)
+            result = call_gemini(prompt, 2048)
         st.markdown(f"""<div style="background:#F8FFF8;border:1.5px solid #2ecc71;border-radius:12px;
             padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
             <b style="color:#27ae60;">📄 AI 생성 사업성 검토 보고서</b><br><br>{result}</div>""",
@@ -487,15 +491,22 @@ with left:
         st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
             file_name=f"{region_name}_AI사업성보고서.txt",
             mime="text/plain", key="dl_report")
-    img_url = "https://images.unsplash.com/photo-1554469384-e58fac16e23a?q=80&w=2000&auto=format&fit=crop"
-    try:
-        st.image(img_url, use_container_width=True)
-    except Exception:
-        st.markdown(f'<div style="width:100%;min-height:540px;border-radius:16px;background:linear-gradient(135deg,{ACCENT} 0%,{ACCENT2} 100%);"></div>', unsafe_allow_html=True)
+    # 우측: OpenStreetMap 지도 (구글맵 미사용 · API 키 불필요)
+    # 기본 좌표: 서울 시청 일대 (필요시 사이드바 입력으로 확장 가능)
+    map_lat, map_lon = 37.5665, 126.9780
+    d = 0.06  # 지도 표시 범위
+    bbox = f"{map_lon-d},{map_lat-d/1.6},{map_lon+d},{map_lat+d/1.6}"
+    osm_url = (f"https://www.openstreetmap.org/export/embed.html?"
+               f"bbox={bbox}&layer=mapnik&marker={map_lat},{map_lon}")
     st.markdown(f"""
-    <div style="margin-top:-7px; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
-      <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">Professional Feasibility Analysis</h3>
-      <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">For Real Estate Developers &amp; Consultants</p>
+    <div style="border-radius:16px 16px 0 0; overflow:hidden; border:1px solid #E5E8EB; border-bottom:none;">
+      <iframe width="100%" height="520" frameborder="0" scrolling="no"
+        marginheight="0" marginwidth="0" src="{osm_url}"
+        style="display:block;"></iframe>
+    </div>
+    <div style="margin-top:0; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
+      <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">📍 대상 구역 위치 분석</h3>
+      <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">{region_name} · 입지 검토용 지도 (OpenStreetMap)</p>
     </div>
     """, unsafe_allow_html=True)
 
