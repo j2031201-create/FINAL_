@@ -12,7 +12,7 @@ def call_gemini(prompt: str, max_tokens: int = 1000) -> str:
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if not api_key:
         return "⚠️ Gemini API 키가 설정되지 않았습니다. Streamlit secrets에 GEMINI_API_KEY를 입력하세요."
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     body = {"contents":[{"parts":[{"text": prompt}]}],
             "generationConfig":{"maxOutputTokens": max_tokens, "temperature": 0.7}}
     try:
@@ -404,7 +404,7 @@ with left:
 비례율: {biz['biryul']:.1f}%
 총사업비: {biz['total_cost']:.0f}억원
 사업이익: {biz['profit']:.0f}억원
-종전자산: {biz['existing']:.0f}억원
+종전자산: {prev:.0f}억원
 종후자산: {biz['post']:.0f}억원
 법정요건 충족: {'예' if okv else '아니오'}
 사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
