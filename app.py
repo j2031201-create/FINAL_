@@ -521,17 +521,59 @@ with right:
                 map_lat, map_lon, place_label = geo
                 st.success(f"📍 {place_label[:50]}")
             else:
-                st.warning("위치를 찾지 못했습니다. 다른 검색어를 입력해보세요.")
+                st.warning("위치를 찾지 못했습니다. 카카오맵 검색창에서 단지명·가게명으로 다시 찾아보세요.")
 
-        d = 0.04
-        bbox = f"{map_lon-d},{map_lat-d/1.6},{map_lon+d},{map_lat+d/1.6}"
-        osm_url = (f"https://www.openstreetmap.org/export/embed.html?"
-                   f"bbox={bbox}&layer=mapnik&marker={map_lat},{map_lon}")
-        st.markdown(f"""
-        <div style="border-radius:16px; overflow:hidden; border:1px solid #E5E8EB;">
-          <iframe width="100%" height="360" frameborder="0" scrolling="no"
-            marginheight="0" marginwidth="0" src="{osm_url}" style="display:block;"></iframe>
-        </div>""", unsafe_allow_html=True)
+        # 사업단지 반경 (m) — 이 범위를 기준으로 입지 판단
+        radius = st.slider("📐 사업단지 반경 (m)", 100, 1500, 500, step=50, key="biz_radius")
+
+        # ── 카카오맵 (키워드 장소검색 + 사업범위 원) ──
+        kakao_key = st.secrets.get("KAKAO_JS_KEY", "")
+        if not kakao_key:
+            st.warning("⚠️ 카카오맵 키(KAKAO_JS_KEY)가 설정되지 않았습니다. Streamlit secrets에 입력하세요.")
+            st.markdown(f"""<div style="border-radius:16px;overflow:hidden;border:1px solid #E5E8EB;">
+              <iframe width="100%" height="360" frameborder="0" scrolling="no"
+                src="https://www.openstreetmap.org/export/embed.html?bbox={map_lon-0.04},{map_lat-0.025},{map_lon+0.04},{map_lat+0.025}&marker={map_lat},{map_lon}"
+                style="display:block;"></iframe></div>""", unsafe_allow_html=True)
+        else:
+            kakao_html = f"""
+            <div style="position:relative;">
+              <input id="ksearch" type="text" placeholder="🔍 단지명·가게명 검색 (예: 한남더힐, 잠실 자이)"
+                style="width:100%;padding:11px 14px;border:1px solid #ccc;border-radius:10px;margin-bottom:8px;font-size:14px;box-sizing:border-box;"/>
+              <div id="kmap" style="width:100%;height:380px;border-radius:14px;"></div>
+              <div id="kinfo" style="margin-top:8px;font-size:13px;color:#333;"></div>
+            </div>
+            <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services&autoload=false"></script>
+            <script>
+              kakao.maps.load(function(){{
+                var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+                var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
+                var marker = new kakao.maps.Marker({{position:center, map:map}});
+                // 사업단지 범위 원
+                var circle = new kakao.maps.Circle({{
+                  center:center, radius:{radius},
+                  strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
+                  fillColor:'#1B64DA', fillOpacity:0.18
+                }});
+                circle.setMap(map);
+                var ps = new kakao.maps.services.Places();
+                function moveTo(lat,lng,name){{
+                  var pos = new kakao.maps.LatLng(lat,lng);
+                  map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
+                  document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
+                }}
+                document.getElementById('ksearch').addEventListener('keydown', function(e){{
+                  if(e.key==='Enter'){{
+                    ps.keywordSearch(this.value, function(data,status){{
+                      if(status===kakao.maps.services.Status.OK){{
+                        moveTo(data[0].y, data[0].x, data[0].place_name);
+                      }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다.'; }}
+                    }});
+                  }}
+                }});
+              }});
+            </script>"""
+            st.components.v1.html(kakao_html, height=480)
+            st.caption(f"💡 지도 위 검색창에서 단지명·가게명으로 검색하면 위치 이동 + 반경 {radius}m 원이 그려집니다.")
 
         # AI 입지 분석 버튼
         if st.button("🤖 AI 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
@@ -542,6 +584,7 @@ with right:
 [분석 대상]
 - 위치: {place_label}
 - 좌표: 위도 {map_lat:.4f}, 경도 {map_lon:.4f}
+- 사업단지 반경: {radius}m (이 범위 내 입지 여건 중심으로 분석)
 - 사업: {ai_input}
 
 다음을 한국어로 구조적으로 분석해주세요:
