@@ -6,6 +6,8 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 import requests, json
+import folium
+from streamlit_folium import st_folium
 
 # ── Gemini API 공통 호출 함수 ──────────────────────────
 def call_gemini(prompt: str, max_tokens: int = 2048) -> str:
@@ -507,11 +509,11 @@ with right:
             st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
                 file_name=f"{region_name}_AI사업성보고서.txt",
                 mime="text/plain", key="dl_report")
-        # ── AI 입지·수주 분석 엔진 (주소검색 + 동적 지도 + Gemini) ──
+        # ── AI 입지·수주 분석 엔진 (주소검색 + Folium 지도 + Gemini) ──
         st.markdown('<div class="sec-title">🗺️ AI 입지·수주 분석</div>', unsafe_allow_html=True)
 
-        addr_q = st.text_input("📍 AI 분석 기준 지명 (선택 입력)", value="",
-            placeholder="예: 성수동, 잠실 — 지도 검색은 아래 지도에서 직접 하세요", key="addr_q")
+        addr_q = st.text_input("📍 구역명·단지명·주소 검색", value="",
+            placeholder="예: 한남더힐, 성수전략정비구역, 잠실 자이, 왕십리역", key="addr_q")
 
         # 좌표 결정: 검색하면 그 위치, 아니면 서울시청
         map_lat, map_lon, place_label = 37.5665, 126.9780, "서울시청 (기본 위치)"
@@ -519,72 +521,22 @@ with right:
             geo = geocode(addr_q.strip())
             if geo:
                 map_lat, map_lon, place_label = geo
-                st.success(f"📍 {place_label[:50]}")
+                st.success(f"📍 {place_label[:55]}")
             else:
-                st.warning("위치를 찾지 못했습니다. 카카오맵 검색창에서 단지명·가게명으로 다시 찾아보세요.")
+                st.warning("위치를 찾지 못했습니다. 단지명이 안 되면 '동 이름'이나 '가까운 역'으로 검색해보세요.")
 
         # 사업단지 반경 (m) — 이 범위를 기준으로 입지 판단
         radius = st.slider("📐 사업단지 반경 (m)", 100, 1500, 500, step=50, key="biz_radius")
 
-        # ── 카카오맵 (키워드 장소검색 + 사업범위 원) ──
-        kakao_key = st.secrets.get("KAKAO_JS_KEY", "")
-        if not kakao_key:
-            st.warning("⚠️ 카카오맵 키(KAKAO_JS_KEY)가 설정되지 않았습니다. Streamlit secrets에 입력하세요.")
-            st.markdown(f"""<div style="border-radius:16px;overflow:hidden;border:1px solid #E5E8EB;">
-              <iframe width="100%" height="360" frameborder="0" scrolling="no"
-                src="https://www.openstreetmap.org/export/embed.html?bbox={map_lon-0.04},{map_lat-0.025},{map_lon+0.04},{map_lat+0.025}&marker={map_lat},{map_lon}"
-                style="display:block;"></iframe></div>""", unsafe_allow_html=True)
-        else:
-            kakao_html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="margin:0;">
-  <input id="ksearch" type="text" placeholder="🔍 단지명·가게명 검색 (예: 한남더힐, 잠실 자이)"
-    style="width:100%;padding:11px 14px;border:1px solid #ccc;border-radius:10px;margin-bottom:8px;font-size:14px;box-sizing:border-box;"/>
-  <div id="kmap" style="width:100%;height:380px;border-radius:14px;background:#eee;"></div>
-  <div id="kinfo" style="margin-top:8px;font-size:13px;color:#333;"></div>
-  <script>
-    function initKakaoMap() {{
-      kakao.maps.load(function() {{
-        var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-        var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
-        var marker = new kakao.maps.Marker({{position:center, map:map}});
-        var circle = new kakao.maps.Circle({{
-          center:center, radius:{radius},
-          strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
-          fillColor:'#1B64DA', fillOpacity:0.18
-        }});
-        circle.setMap(map);
-        var ps = new kakao.maps.services.Places();
-        function moveTo(lat,lng,name){{
-          var pos = new kakao.maps.LatLng(lat,lng);
-          map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
-          document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
-        }}
-        document.getElementById('ksearch').addEventListener('keydown', function(e){{
-          if(e.key==='Enter'){{
-            e.preventDefault();
-            ps.keywordSearch(this.value, function(data,status){{
-              if(status===kakao.maps.services.Status.OK){{
-                moveTo(data[0].y, data[0].x, data[0].place_name);
-              }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다. 다른 키워드로 시도하세요.'; }}
-            }});
-          }}
-        }});
-      }});
-    }}
-    function kakaoFail() {{
-      document.getElementById('kinfo').innerHTML =
-        '⚠️ 카카오 SDK 로드 실패 — JavaScript 키가 맞는지, 도메인이 정확히 등록됐는지 확인하세요.';
-    }}
-  </script>
-  <script type="text/javascript"
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services&autoload=false"
-    onload="initKakaoMap()" onerror="kakaoFail()"></script>
-</body>
-</html>"""
-            st.components.v1.html(kakao_html, height=470)
-            st.caption(f"💡 지도 위 검색창에 단지명·가게명을 입력하고 Enter → 위치 이동 + 반경 {radius}m 원이 그려집니다.")
+        # ── Folium 지도 (마커 + 사업범위 원) · 키/도메인 불필요, 확실히 렌더 ──
+        fmap = folium.Map(location=[map_lat, map_lon], zoom_start=15, tiles="OpenStreetMap")
+        folium.Marker([map_lat, map_lon], tooltip=place_label[:40],
+                      icon=folium.Icon(color="blue", icon="building", prefix="fa")).add_to(fmap)
+        folium.Circle(location=[map_lat, map_lon], radius=radius,
+                      color="#1B64DA", weight=2, fill=True, fill_color="#1B64DA",
+                      fill_opacity=0.18, tooltip=f"사업단지 반경 {radius}m").add_to(fmap)
+        st_folium(fmap, width=None, height=380, returned_objects=[], key="biz_map")
+        st.caption(f"📐 파란 원 = 사업단지 반경 {radius}m · 이 범위를 기준으로 AI가 입지를 분석합니다.")
 
         # AI 입지 분석 버튼
         if st.button("🤖 AI 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
