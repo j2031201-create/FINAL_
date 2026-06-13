@@ -26,6 +26,21 @@ def call_gemini(prompt: str, max_tokens: int = 2048) -> str:
     except Exception as e:
         return f"⚠️ AI 응답 오류: {str(e)[:80]}"
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def geocode(query: str):
+    """주소·지명 → 위경도 (Nominatim, 무료·키 불필요). 실패 시 None"""
+    try:
+        r = requests.get("https://nominatim.openstreetmap.org/search",
+            params={"q": query, "format": "json", "limit": 1, "countrycodes": "kr"},
+            headers={"User-Agent": "jeongbi-feasibility-app"}, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"]), data[0].get("display_name", query)
+    except Exception:
+        pass
+    return None
+
 st.set_page_config(page_title="정비사업 수주 타당성 분석", page_icon="🏗️",
                    layout="wide", initial_sidebar_state="expanded")
 
@@ -492,23 +507,72 @@ with right:
             st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
                 file_name=f"{region_name}_AI사업성보고서.txt",
                 mime="text/plain", key="dl_report")
-        # 우측: OpenStreetMap 지도 (구글맵 미사용 · API 키 불필요)
-        # 기본 좌표: 서울 시청 일대 (필요시 사이드바 입력으로 확장 가능)
-        map_lat, map_lon = 37.5665, 126.9780
-        d = 0.06  # 지도 표시 범위
+        # ── AI 입지·수주 분석 엔진 (주소검색 + 동적 지도 + Gemini) ──
+        st.markdown('<div class="sec-title">🗺️ AI 입지·수주 분석</div>', unsafe_allow_html=True)
+
+        addr_q = st.text_input("📍 구역명·주소 검색", value="",
+            placeholder="예: 성수전략정비구역, 왕십리역, 서울시 성동구", key="addr_q")
+
+        # 좌표 결정: 검색하면 그 위치, 아니면 서울시청
+        map_lat, map_lon, place_label = 37.5665, 126.9780, "서울시청 (기본 위치)"
+        if addr_q.strip():
+            geo = geocode(addr_q.strip())
+            if geo:
+                map_lat, map_lon, place_label = geo
+                st.success(f"📍 {place_label[:50]}")
+            else:
+                st.warning("위치를 찾지 못했습니다. 다른 검색어를 입력해보세요.")
+
+        d = 0.04
         bbox = f"{map_lon-d},{map_lat-d/1.6},{map_lon+d},{map_lat+d/1.6}"
         osm_url = (f"https://www.openstreetmap.org/export/embed.html?"
                    f"bbox={bbox}&layer=mapnik&marker={map_lat},{map_lon}")
         st.markdown(f"""
-        <div style="border-radius:16px 16px 0 0; overflow:hidden; border:1px solid #E5E8EB; border-bottom:none;">
-          <iframe width="100%" height="520" frameborder="0" scrolling="no"
-            marginheight="0" marginwidth="0" src="{osm_url}"
-            style="display:block;"></iframe>
-        </div>
-        <div style="margin-top:0; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
-          <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">📍 대상 구역 위치 분석</h3>
-          <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">{region_name} · 입지 검토용 지도 (OpenStreetMap)</p>
-        </div>
-        """, unsafe_allow_html=True)
+        <div style="border-radius:16px; overflow:hidden; border:1px solid #E5E8EB;">
+          <iframe width="100%" height="360" frameborder="0" scrolling="no"
+            marginheight="0" marginwidth="0" src="{osm_url}" style="display:block;"></iframe>
+        </div>""", unsafe_allow_html=True)
+
+        # AI 입지 분석 버튼
+        if st.button("🤖 AI 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
+                     disabled=not addr_q.strip()):
+            loc_prompt = f"""당신은 한국 부동산 입지·정비사업 수주 분석 전문가입니다.
+다음 위치와 사업 정보를 바탕으로 입지를 분석해주세요. 실제 해당 지역에 대한 지식을 활용하되, 추정임을 전제로 하세요.
+
+[분석 대상]
+- 위치: {place_label}
+- 좌표: 위도 {map_lat:.4f}, 경도 {map_lon:.4f}
+- 사업: {ai_input}
+
+다음을 한국어로 구조적으로 분석해주세요:
+
+## 1. 입지 점수 (100점 만점)
+- 교통 (__/35): 지하철·버스 접근성 추정
+- 생활인프라 (__/30): 학교·병원·마트·공원
+- 개발호재 (__/20): 신규 철도·도시개발·정비사업
+- 위험요인 (__/15): 노후상권·공급과잉 등 감점요소
+- **총점: __점**
+
+## 2. 역세권 판정
+- 가장 가까운 지하철역(추정)과 거리, 등급(초역세권 250m↓/역세권 500m↓/준역세권 1km↓/비역세권)
+- 예상 분양가 프리미엄
+
+## 3. 경쟁 정비사업
+- 인근 3km 내 추진 중인 정비사업 추정과 공급 부담
+
+## 4. AI 수주 성공 확률 (0~100%)
+- 사업성·입지성·주민수용성·시장성·경쟁도를 종합한 수주 성공 확률 %
+- 세부 점수와 근거
+
+## 5. 종합 총평 (3~4문장)
+- 수주 추천 여부와 차별화 전략"""
+            with st.spinner("🤖 입지·수주 분석 중... (지도 데이터 + AI)"):
+                result = call_gemini(loc_prompt, 2048)
+            st.markdown(f"""<div style="background:#F0F6FF;border:1.5px solid {ACCENT};border-radius:12px;
+                padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:{ACCENT};">🗺️ AI 입지·수주 분석 리포트</b><br>
+                <span style="font-size:12px;color:#888;">📍 {place_label[:45]}</span><br><br>{result}</div>""",
+                unsafe_allow_html=True)
+            st.caption("※ AI 추정 분석입니다. 실제 사업 판단 시 현장 실사와 공공데이터 확인이 필요합니다.")
 
 st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
