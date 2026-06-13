@@ -48,6 +48,23 @@ st.set_page_config(page_title="정비사업 수주 타당성 분석", page_icon=
 
 if "mode" not in st.session_state:
     st.session_state.mode = "advanced" if False else "basic"
+
+# 누적 데이터에서 "불러오기" 클릭 시: 입력값을 위젯 생성 전에 주입
+if "_restore" in st.session_state:
+    rd = st.session_state.pop("_restore")
+    st.session_state.mode = rd.get("mode", "basic")
+    _map = {"region":"v_region","pt":"v_pt","area":"v_area","year":"v_year","diag":"v_diag",
+            "oldr":"v_oldr","lot":"v_lot","stype":"v_stype","agree":"v_agree","total":"v_total",
+            "member":"v_member","avgm2":"v_avgm2","prev":"v_prev","gprice":"v_gprice",
+            "mprice":"v_mprice","cc":"v_cc","other":"v_other","donation":"v_donation",
+            "shoparea":"v_shoparea","shopprice":"v_shopprice","pfrate":"v_pfrate","delay":"v_delay"}
+    for k, v in rd.items():
+        if k in _map and v is not None:
+            st.session_state[_map[k]] = v
+    # small 유형의 oldr은 별도 key(v_oldr2)
+    if rd.get("pt")=="small" and rd.get("oldr") is not None:
+        st.session_state["v_oldr2"] = rd["oldr"]
+
 ADV = st.session_state.mode == "advanced"
 
 SB_ON, supabase = False, None
@@ -145,22 +162,22 @@ with st.sidebar:
         st.rerun()
 
     st.markdown('<div class="side-h">📍 구역 정보</div>', unsafe_allow_html=True)
-    region_name = st.text_input("구역명", "○○3 후보구역", label_visibility="collapsed")
-    pt = st.radio("사업 유형", ["rebuild","redevelop","small"], format_func=lambda x:PT_LABEL[x])
+    region_name = st.text_input("구역명", st.session_state.get("v_region","○○3 후보구역"), key="v_region", label_visibility="collapsed")
+    pt = st.radio("사업 유형", ["rebuild","redevelop","small"], format_func=lambda x:PT_LABEL[x], key="v_pt")
 
     st.markdown('<div class="side-h">🏘️ 구역 요건</div>', unsafe_allow_html=True)
-    area = st.number_input("구역면적 (㎡)", 0, value=35000, step=1000)
+    area = st.number_input("구역면적 (㎡)", 0, value=st.session_state.get("v_area",35000), step=1000, key="v_area")
     year, diag, oldr, lot, stype = 1992, "통과(D/E)", 75.0, 30.0, "가로주택정비"
     if pt=="rebuild":
-        diag = st.radio("안전진단", ["통과(D/E)","미통과"], horizontal=True)
-        year = st.number_input("준공연도", 1960, 2025, 1992)
+        diag = st.radio("안전진단", ["통과(D/E)","미통과"], horizontal=True, key="v_diag")
+        year = st.number_input("준공연도", 1960, 2025, st.session_state.get("v_year",1992), key="v_year")
         st.caption(f"경과 {dt.date.today().year-year}년 (법정 30년 이상)")
     elif pt=="redevelop":
-        oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, 75.0)
-        lot = st.slider("과소필지율 (%)", 0.0, 60.0, 30.0)
+        oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, st.session_state.get("v_oldr",75.0), key="v_oldr")
+        lot = st.slider("과소필지율 (%)", 0.0, 60.0, st.session_state.get("v_lot",30.0), key="v_lot")
     else:
-        stype = st.radio("세부유형", ["가로주택정비","자율주택정비","소규모재건축","소규모재개발"])
-        oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, 70.0)
+        stype = st.radio("세부유형", ["가로주택정비","자율주택정비","소규모재건축","소규모재개발"], key="v_stype")
+        oldr = st.slider("노후 동수 비율 (%)", 50.0, 100.0, st.session_state.get("v_oldr",70.0), key="v_oldr2")
         _hint = {
             "가로주택정비":"가로주택: 1만㎡ 미만 · 노후 2/3 이상 · 안전진단 면제",
             "자율주택정비":"자율주택: 단독·다세대 밀집 · 20세대 미만 소규모",
@@ -168,28 +185,28 @@ with st.sidebar:
             "소규모재개발":"소규모재개발: 역세권·준공업 5천㎡ 미만",
         }
         st.caption(_hint[stype])
-    agree = st.slider("주민동의율 (%)", 50.0, 100.0, 75.0)
+    agree = st.slider("주민동의율 (%)", 50.0, 100.0, st.session_state.get("v_agree",75.0), key="v_agree")
 
     st.markdown('<div class="side-h">🏢 분양 계획</div>', unsafe_allow_html=True)
-    total_units = st.number_input("신축 총세대", 1, value=600, step=10)
-    member_units = st.number_input("조합원 분양세대", 0, value=350, step=10, help="나머지가 일반분양분")
-    avg_m2 = st.number_input("세대당 분양면적 (㎡)", 30, 200, 85, help="전용 84㎡ ≈ 국민주택규모")
+    total_units = st.number_input("신축 총세대", 1, value=st.session_state.get("v_total",600), step=10, key="v_total")
+    member_units = st.number_input("조합원 분양세대", 0, value=st.session_state.get("v_member",350), step=10, help="나머지가 일반분양분", key="v_member")
+    avg_m2 = st.number_input("세대당 분양면적 (㎡)", 30, 200, st.session_state.get("v_avgm2",85), help="전용 84㎡ ≈ 국민주택규모", key="v_avgm2")
 
     st.markdown('<div class="side-h">💰 사업성 입력</div>', unsafe_allow_html=True)
-    prev = st.number_input("종전자산 총액 (억)", 0, value=2000, step=100, help="조합원 보유 토지·건물 감정가 합계")
-    g_price = st.number_input("일반분양가 (만원/㎡)", 0, value=850, step=10)
-    m_price = st.number_input("조합원분양가 (만원/㎡)", 0, value=760, step=10)
-    cc = st.number_input("공사비 (만원/㎡)", 0, value=200, step=5)
-    other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50, 28 if pt=="small" else 35,
-                           help="공사비를 제외한 사업 부대비용의 비율 (설계·감리비, 각종 부담금, 신탁보수, 예비비 등 포함. PF 금융비용은 별도 계산)")/100
+    prev = st.number_input("종전자산 총액 (억)", 0, value=st.session_state.get("v_prev",2000), step=100, help="조합원 보유 토지·건물 감정가 합계", key="v_prev")
+    g_price = st.number_input("일반분양가 (만원/㎡)", 0, value=st.session_state.get("v_gprice",850), step=10, key="v_gprice")
+    m_price = st.number_input("조합원분양가 (만원/㎡)", 0, value=st.session_state.get("v_mprice",760), step=10, key="v_mprice")
+    cc = st.number_input("공사비 (만원/㎡)", 0, value=st.session_state.get("v_cc",200), step=5, key="v_cc")
+    other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50, st.session_state.get("v_other",28 if pt=="small" else 35),
+                           help="공사비를 제외한 사업 부대비용의 비율 (설계·감리비, 각종 부담금, 신탁보수, 예비비 등 포함. PF 금융비용은 별도 계산)", key="v_other")/100
 
     if ADV:
         st.markdown('<div class="side-h">🎯 인센티브 · 상가 · 금융 (Advanced)</div>', unsafe_allow_html=True)
-        donation_rate = st.slider("기부채납률 (%)", 0, 20, 10, help="높을수록 용적률 인센티브로 세대수 증가")
-        shop_area = st.number_input("상가 연면적 (㎡)", 0, value=1650, step=50)
-        shop_price = st.number_input("상가 분양가 (만원/㎡)", 0, value=1200, step=50)
-        pf_rate = st.number_input("예상 PF 금리 (%)", 0.0, value=8.0, step=0.1)
-        delay_months = st.slider("사업 지연 기간 (개월)", 0, 36, 0)
+        donation_rate = st.slider("기부채납률 (%)", 0, 20, st.session_state.get("v_donation",10), help="높을수록 용적률 인센티브로 세대수 증가", key="v_donation")
+        shop_area = st.number_input("상가 연면적 (㎡)", 0, value=st.session_state.get("v_shoparea",1650), step=50, key="v_shoparea")
+        shop_price = st.number_input("상가 분양가 (만원/㎡)", 0, value=st.session_state.get("v_shopprice",1200), step=50, key="v_shopprice")
+        pf_rate = st.number_input("예상 PF 금리 (%)", 0.0, value=st.session_state.get("v_pfrate",8.0), step=0.1, key="v_pfrate")
+        delay_months = st.slider("사업 지연 기간 (개월)", 0, 36, st.session_state.get("v_delay",0), key="v_delay")
 
 
 # ── 계산 (로직 보존) ──────────────────────────────────
@@ -338,6 +355,14 @@ if save_clicked:
     note = None
     if ADV:
         note = f"ADV|기부{donation_rate}%|상가{shop_area}㎡|PF{pf_rate}%|지연{delay_months}M|금융{biz['finance']:.0f}억"
+    # 전체 입력값을 JSON으로 묶어 복원용으로 저장
+    inputs = dict(mode=st.session_state.mode, region=region_name, pt=pt, area=area,
+                  year=year, diag=diag, oldr=oldr, lot=lot, stype=stype, agree=agree,
+                  total=total_units, member=member_units, avgm2=avg_m2, prev=prev,
+                  gprice=g_price, mprice=m_price, cc=cc, other=int(other_rate*100))
+    if ADV:
+        inputs.update(donation=donation_rate, shoparea=shop_area, shopprice=shop_price,
+                      pfrate=pf_rate, delay=delay_months)
     row = dict(region_name=region_name, project_type=pt,
                small_type=stype if pt=="small" else None,
                area_sqm=area, built_year=year if pt=="rebuild" else None,
@@ -348,7 +373,7 @@ if save_clicked:
                biryul=round(biz["biryul"],2), total_cost=round(biz["total_cost"],1),
                profit=round(biz["profit"],1),
                jeongbi_score=round(score,1) if score is not None else None,
-               verdict=vt, req_pass=okv, note=note)
+               verdict=vt, req_pass=okv, note=note, inputs=json.dumps(inputs, ensure_ascii=False))
     try:
         r = supabase.table("analysis_regions").insert(row).execute()
         st.success(f"저장 완료 (id: {r.data[0]['id']})")
@@ -397,18 +422,34 @@ with left:
 
     # 누적 데이터 (좌측 패널 하단 · 항상 펼침)
     st.markdown('<div class="sec-title">누적 분석 데이터</div>', unsafe_allow_html=True)
-    st.caption("☁️ Supabase 연결됨 · 분석할수록 후보구역 데이터가 누적됩니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
+    st.caption("☁️ Supabase 연결됨 · 행을 선택해 그때 분석을 다시 불러올 수 있습니다" if SB_ON else "💾 로컬 모드 · 연결 설정(secrets) 시 영구 저장 활성화")
     if SB_ON:
         try:
             r = supabase.table("analysis_regions").select(
-                "created_at,region_name,project_type,biryul,total_cost,profit,verdict"
+                "id,created_at,region_name,project_type,biryul,total_cost,profit,verdict,inputs"
             ).order("created_at", desc=True).limit(100).execute()
             if r.data:
-                df = pd.DataFrame(r.data)
+                raw = r.data
+                df = pd.DataFrame(raw)[["created_at","region_name","project_type","biryul","total_cost","profit","verdict"]]
                 df["project_type"] = df["project_type"].map(PT_LABEL).fillna(df["project_type"])
                 df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d")
                 df.columns = ["분석일자","구역명","유형","비례율(%)","총사업비(억)","사업이익(억)","판정"]
-                st.dataframe(df, use_container_width=True, height=440, hide_index=True)
+                st.dataframe(df, use_container_width=True, height=340, hide_index=True)
+
+                # ── 분석 복원 (그때 입력값으로 사이드바 되돌리기) ──
+                st.markdown('<div style="font-size:13px;font-weight:700;color:#191F28;margin:6px 0;">🔄 저장된 분석 불러오기</div>', unsafe_allow_html=True)
+                opts = {f"{pd.to_datetime(x['created_at']).strftime('%m-%d %H:%M')} · {x['region_name']} (비례율 {x['biryul']}%)": x
+                        for x in raw if x.get("inputs")}
+                if opts:
+                    sel = st.selectbox("불러올 분석 선택", list(opts.keys()), label_visibility="collapsed", key="restore_sel")
+                    if st.button("📂 이 분석 다시 보기", use_container_width=True, key="restore_btn"):
+                        try:
+                            st.session_state["_restore"] = json.loads(opts[sel]["inputs"])
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"복원 실패: {e}")
+                else:
+                    st.caption("복원 가능한 저장 항목이 아직 없습니다. (이후 저장분부터 불러오기 지원)")
             else:
                 st.info("저장된 데이터가 없습니다.")
         except Exception as e:
