@@ -510,8 +510,8 @@ with right:
         # ── AI 입지·수주 분석 엔진 (주소검색 + 동적 지도 + Gemini) ──
         st.markdown('<div class="sec-title">🗺️ AI 입지·수주 분석</div>', unsafe_allow_html=True)
 
-        addr_q = st.text_input("📍 구역명·주소 검색", value="",
-            placeholder="예: 성수전략정비구역, 왕십리역, 서울시 성동구", key="addr_q")
+        addr_q = st.text_input("📍 AI 분석 기준 지명 (선택 입력)", value="",
+            placeholder="예: 성수동, 잠실 — 지도 검색은 아래 지도에서 직접 하세요", key="addr_q")
 
         # 좌표 결정: 검색하면 그 위치, 아니면 서울시청
         map_lat, map_lon, place_label = 37.5665, 126.9780, "서울시청 (기본 위치)"
@@ -535,45 +535,54 @@ with right:
                 src="https://www.openstreetmap.org/export/embed.html?bbox={map_lon-0.04},{map_lat-0.025},{map_lon+0.04},{map_lat+0.025}&marker={map_lat},{map_lon}"
                 style="display:block;"></iframe></div>""", unsafe_allow_html=True)
         else:
-            kakao_html = f"""
-            <div style="position:relative;">
-              <input id="ksearch" type="text" placeholder="🔍 단지명·가게명 검색 (예: 한남더힐, 잠실 자이)"
-                style="width:100%;padding:11px 14px;border:1px solid #ccc;border-radius:10px;margin-bottom:8px;font-size:14px;box-sizing:border-box;"/>
-              <div id="kmap" style="width:100%;height:380px;border-radius:14px;"></div>
-              <div id="kinfo" style="margin-top:8px;font-size:13px;color:#333;"></div>
-            </div>
-            <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services&autoload=false"></script>
-            <script>
-              kakao.maps.load(function(){{
-                var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-                var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
-                var marker = new kakao.maps.Marker({{position:center, map:map}});
-                // 사업단지 범위 원
-                var circle = new kakao.maps.Circle({{
-                  center:center, radius:{radius},
-                  strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
-                  fillColor:'#1B64DA', fillOpacity:0.18
-                }});
-                circle.setMap(map);
-                var ps = new kakao.maps.services.Places();
-                function moveTo(lat,lng,name){{
-                  var pos = new kakao.maps.LatLng(lat,lng);
-                  map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
-                  document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
-                }}
-                document.getElementById('ksearch').addEventListener('keydown', function(e){{
-                  if(e.key==='Enter'){{
-                    ps.keywordSearch(this.value, function(data,status){{
-                      if(status===kakao.maps.services.Status.OK){{
-                        moveTo(data[0].y, data[0].x, data[0].place_name);
-                      }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다.'; }}
-                    }});
-                  }}
-                }});
-              }});
-            </script>"""
-            st.components.v1.html(kakao_html, height=480)
-            st.caption(f"💡 지도 위 검색창에서 단지명·가게명으로 검색하면 위치 이동 + 반경 {radius}m 원이 그려집니다.")
+            kakao_html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;">
+  <input id="ksearch" type="text" placeholder="🔍 단지명·가게명 검색 (예: 한남더힐, 잠실 자이)"
+    style="width:100%;padding:11px 14px;border:1px solid #ccc;border-radius:10px;margin-bottom:8px;font-size:14px;box-sizing:border-box;"/>
+  <div id="kmap" style="width:100%;height:380px;border-radius:14px;background:#eee;"></div>
+  <div id="kinfo" style="margin-top:8px;font-size:13px;color:#333;"></div>
+  <script type="text/javascript"
+    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services"></script>
+  <script>
+    window.onload = function() {{
+      if (typeof kakao === "undefined" || !kakao.maps) {{
+        document.getElementById('kinfo').innerHTML =
+          '⚠️ 카카오맵 로드 실패 — 카카오 개발자사이트에서 이 앱 도메인(Web 플랫폼)을 등록했는지 확인하세요.';
+        return;
+      }}
+      var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+      var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
+      var marker = new kakao.maps.Marker({{position:center, map:map}});
+      var circle = new kakao.maps.Circle({{
+        center:center, radius:{radius},
+        strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
+        fillColor:'#1B64DA', fillOpacity:0.18
+      }});
+      circle.setMap(map);
+      var ps = new kakao.maps.services.Places();
+      function moveTo(lat,lng,name){{
+        var pos = new kakao.maps.LatLng(lat,lng);
+        map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
+        document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
+      }}
+      document.getElementById('ksearch').addEventListener('keydown', function(e){{
+        if(e.key==='Enter'){{
+          e.preventDefault();
+          ps.keywordSearch(this.value, function(data,status){{
+            if(status===kakao.maps.services.Status.OK){{
+              moveTo(data[0].y, data[0].x, data[0].place_name);
+            }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다. 다른 키워드로 시도하세요.'; }}
+          }});
+        }}
+      }});
+    }};
+  </script>
+</body>
+</html>"""
+            st.components.v1.html(kakao_html, height=470)
+            st.caption(f"💡 지도 위 검색창에 단지명·가게명을 입력하고 Enter → 위치 이동 + 반경 {radius}m 원이 그려집니다.")
 
         # AI 입지 분석 버튼
         if st.button("🤖 AI 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
