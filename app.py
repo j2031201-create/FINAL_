@@ -399,115 +399,116 @@ with left:
     else:
         st.info("연결 설정 시 누적 데이터가 표시됩니다.")
 
-    # ── AI 어시스턴트 패널 ──────────────────────────────
-    st.markdown('<div class="sec-title">🤖 AI 어시스턴트</div>', unsafe_allow_html=True)
+with right:
+        # ── AI 어시스턴트 패널 ──────────────────────────────
+        st.markdown('<div class="sec-title">🤖 AI 어시스턴트</div>', unsafe_allow_html=True)
 
-    # 공통 입력 데이터 (계산 결과 기반)
-    ai_input = f"""사업 유형: {PT_LABEL.get(pt, pt)}
-구역명: {region_name}
-비례율: {biz['biryul']:.1f}%
-총사업비: {biz['total_cost']:.0f}억원
-사업이익: {biz['profit']:.0f}억원
-종전자산: {prev:.0f}억원
-종후자산: {biz['post']:.0f}억원
-법정요건 충족: {'예' if okv else '아니오'}
-사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
+        # 공통 입력 데이터 (계산 결과 기반)
+        ai_input = f"""사업 유형: {PT_LABEL.get(pt, pt)}
+    구역명: {region_name}
+    비례율: {biz['biryul']:.1f}%
+    총사업비: {biz['total_cost']:.0f}억원
+    사업이익: {biz['profit']:.0f}억원
+    종전자산: {prev:.0f}억원
+    종후자산: {biz['post']:.0f}억원
+    법정요건 충족: {'예' if okv else '아니오'}
+    사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
 
-    # 1) AI 사업성 컨설턴트
-    if st.button("🤖 AI 컨설턴트 분석", use_container_width=True, key="ai_consult"):
-        prompt = f"""당신은 한국 정비사업(재건축·재개발) 전문 컨설턴트입니다.
-다음 사업 데이터를 분석하고 전문가 의견을 제시해주세요.
+        # 1) AI 사업성 컨설턴트
+        if st.button("🤖 AI 컨설턴트 분석", use_container_width=True, key="ai_consult"):
+            prompt = f"""당신은 한국 정비사업(재건축·재개발) 전문 컨설턴트입니다.
+    다음 사업 데이터를 분석하고 전문가 의견을 제시해주세요.
 
-[사업 데이터]
-{ai_input}
+    [사업 데이터]
+    {ai_input}
 
-다음 6가지를 한국어로 간결하게 답해주세요:
-1. 사업성 등급: S/A/B/C/D 중 하나 + 근거 한 줄
-2. 추진 권고 여부: 적극 추진 / 조건부 추진 / 보류 / 재검토 필요 중 하나 + 이유
-3. 강점: 이 사업의 핵심 강점 2가지
-4. 약점: 주요 리스크 요인 2가지
-5. 추천 전략: 사업 추진 시 핵심 전략 2~3문장
-6. 최종 의견: 수주사 입장에서의 종합 판단 2문장"""
-        with st.spinner("🤖 AI 컨설턴트 분석 중..."):
-            result = call_gemini(prompt, 2048)
-        st.markdown(f"""<div style="background:#F5F8FF;border:1.5px solid #1B64DA;border-radius:12px;
-            padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
-            <b style="color:#1B64DA;">🤖 AI 사업성 컨설턴트 의견</b><br><br>{result}</div>""",
-            unsafe_allow_html=True)
+    다음 6가지를 한국어로 간결하게 답해주세요:
+    1. 사업성 등급: S/A/B/C/D 중 하나 + 근거 한 줄
+    2. 추진 권고 여부: 적극 추진 / 조건부 추진 / 보류 / 재검토 필요 중 하나 + 이유
+    3. 강점: 이 사업의 핵심 강점 2가지
+    4. 약점: 주요 리스크 요인 2가지
+    5. 추천 전략: 사업 추진 시 핵심 전략 2~3문장
+    6. 최종 의견: 수주사 입장에서의 종합 판단 2문장"""
+            with st.spinner("🤖 AI 컨설턴트 분석 중..."):
+                result = call_gemini(prompt, 2048)
+            st.markdown(f"""<div style="background:#F5F8FF;border:1.5px solid #1B64DA;border-radius:12px;
+                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#1B64DA;">🤖 AI 사업성 컨설턴트 의견</b><br><br>{result}</div>""",
+                unsafe_allow_html=True)
 
-    # 2) AI 리스크 분석
-    if st.button("⚠️ 주요 리스크 분석", use_container_width=True, key="ai_risk"):
-        prompt = f"""당신은 한국 정비사업 리스크 분석 전문가입니다.
-다음 사업의 리스크를 분석해주세요.
+        # 2) AI 리스크 분석
+        if st.button("⚠️ 주요 리스크 분석", use_container_width=True, key="ai_risk"):
+            prompt = f"""당신은 한국 정비사업 리스크 분석 전문가입니다.
+    다음 사업의 리스크를 분석해주세요.
 
-[사업 데이터]
-{ai_input}
+    [사업 데이터]
+    {ai_input}
 
-다음 4가지를 한국어로 분석해주세요:
-1. 사업 실패 가능성: 낮음/중간/높음 + 주요 이유 2문장
-2. 핵심 위험요소: 가장 중요한 리스크 3가지와 각 설명 한 줄
-3. 민감도 분석: 비례율·분양가·공사비 변동 시 사업성 영향 2~3문장
-4. 대응 전략: 각 리스크별 대응 방안 2~3문장"""
-        with st.spinner("⚠️ 리스크 분석 중..."):
-            result = call_gemini(prompt, 2048)
-        st.markdown(f"""<div style="background:#FFF8F0;border:1.5px solid #E8590C;border-radius:12px;
-            padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
-            <b style="color:#E8590C;">⚠️ AI 리스크 분석 결과</b><br><br>{result}</div>""",
-            unsafe_allow_html=True)
+    다음 4가지를 한국어로 분석해주세요:
+    1. 사업 실패 가능성: 낮음/중간/높음 + 주요 이유 2문장
+    2. 핵심 위험요소: 가장 중요한 리스크 3가지와 각 설명 한 줄
+    3. 민감도 분석: 비례율·분양가·공사비 변동 시 사업성 영향 2~3문장
+    4. 대응 전략: 각 리스크별 대응 방안 2~3문장"""
+            with st.spinner("⚠️ 리스크 분석 중..."):
+                result = call_gemini(prompt, 2048)
+            st.markdown(f"""<div style="background:#FFF8F0;border:1.5px solid #E8590C;border-radius:12px;
+                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#E8590C;">⚠️ AI 리스크 분석 결과</b><br><br>{result}</div>""",
+                unsafe_allow_html=True)
 
-    # 3) AI 개발사업 보고서 생성
-    if st.button("📄 AI 보고서 생성", use_container_width=True, key="ai_report"):
-        prompt = f"""당신은 한국 정비사업 전문 보고서 작성자입니다.
-다음 사업 데이터를 바탕으로 간략한 사업성 검토 보고서를 작성해주세요.
+        # 3) AI 개발사업 보고서 생성
+        if st.button("📄 AI 보고서 생성", use_container_width=True, key="ai_report"):
+            prompt = f"""당신은 한국 정비사업 전문 보고서 작성자입니다.
+    다음 사업 데이터를 바탕으로 간략한 사업성 검토 보고서를 작성해주세요.
 
-[사업 데이터]
-{ai_input}
+    [사업 데이터]
+    {ai_input}
 
-다음 구조로 마크다운 형식의 보고서를 작성해주세요:
-## 1. 사업 개요
-(구역명, 사업 유형, 핵심 지표 요약 3~4문장)
+    다음 구조로 마크다운 형식의 보고서를 작성해주세요:
+    ## 1. 사업 개요
+    (구역명, 사업 유형, 핵심 지표 요약 3~4문장)
 
-## 2. 시장 분석
-(정비사업 시장 현황과 본 사업의 시장 포지셔닝 3~4문장)
+    ## 2. 시장 분석
+    (정비사업 시장 현황과 본 사업의 시장 포지셔닝 3~4문장)
 
-## 3. 사업성 평가
-(비례율·수익성 분석 및 법정요건 충족 여부 4~5문장)
+    ## 3. 사업성 평가
+    (비례율·수익성 분석 및 법정요건 충족 여부 4~5문장)
 
-## 4. 리스크 분석
-(주요 위험요소 3가지와 대응방안)
+    ## 4. 리스크 분석
+    (주요 위험요소 3가지와 대응방안)
 
-## 5. 추진 전략
-(수주사 입장에서의 핵심 추진 전략 3~4문장)
+    ## 5. 추진 전략
+    (수주사 입장에서의 핵심 추진 전략 3~4문장)
 
-## 6. 최종 권고안
-(수주 여부 최종 권고 및 조건 2~3문장)"""
-        with st.spinner("📄 AI 보고서 생성 중..."):
-            result = call_gemini(prompt, 2048)
-        st.markdown(f"""<div style="background:#F8FFF8;border:1.5px solid #2ecc71;border-radius:12px;
-            padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
-            <b style="color:#27ae60;">📄 AI 생성 사업성 검토 보고서</b><br><br>{result}</div>""",
-            unsafe_allow_html=True)
-        # 텍스트 다운로드 버튼
-        st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
-            file_name=f"{region_name}_AI사업성보고서.txt",
-            mime="text/plain", key="dl_report")
-    # 우측: OpenStreetMap 지도 (구글맵 미사용 · API 키 불필요)
-    # 기본 좌표: 서울 시청 일대 (필요시 사이드바 입력으로 확장 가능)
-    map_lat, map_lon = 37.5665, 126.9780
-    d = 0.06  # 지도 표시 범위
-    bbox = f"{map_lon-d},{map_lat-d/1.6},{map_lon+d},{map_lat+d/1.6}"
-    osm_url = (f"https://www.openstreetmap.org/export/embed.html?"
-               f"bbox={bbox}&layer=mapnik&marker={map_lat},{map_lon}")
-    st.markdown(f"""
-    <div style="border-radius:16px 16px 0 0; overflow:hidden; border:1px solid #E5E8EB; border-bottom:none;">
-      <iframe width="100%" height="520" frameborder="0" scrolling="no"
-        marginheight="0" marginwidth="0" src="{osm_url}"
-        style="display:block;"></iframe>
-    </div>
-    <div style="margin-top:0; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
-      <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">📍 대상 구역 위치 분석</h3>
-      <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">{region_name} · 입지 검토용 지도 (OpenStreetMap)</p>
-    </div>
-    """, unsafe_allow_html=True)
+    ## 6. 최종 권고안
+    (수주 여부 최종 권고 및 조건 2~3문장)"""
+            with st.spinner("📄 AI 보고서 생성 중..."):
+                result = call_gemini(prompt, 2048)
+            st.markdown(f"""<div style="background:#F8FFF8;border:1.5px solid #2ecc71;border-radius:12px;
+                padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#27ae60;">📄 AI 생성 사업성 검토 보고서</b><br><br>{result}</div>""",
+                unsafe_allow_html=True)
+            # 텍스트 다운로드 버튼
+            st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
+                file_name=f"{region_name}_AI사업성보고서.txt",
+                mime="text/plain", key="dl_report")
+        # 우측: OpenStreetMap 지도 (구글맵 미사용 · API 키 불필요)
+        # 기본 좌표: 서울 시청 일대 (필요시 사이드바 입력으로 확장 가능)
+        map_lat, map_lon = 37.5665, 126.9780
+        d = 0.06  # 지도 표시 범위
+        bbox = f"{map_lon-d},{map_lat-d/1.6},{map_lon+d},{map_lat+d/1.6}"
+        osm_url = (f"https://www.openstreetmap.org/export/embed.html?"
+                   f"bbox={bbox}&layer=mapnik&marker={map_lat},{map_lon}")
+        st.markdown(f"""
+        <div style="border-radius:16px 16px 0 0; overflow:hidden; border:1px solid #E5E8EB; border-bottom:none;">
+          <iframe width="100%" height="520" frameborder="0" scrolling="no"
+            marginheight="0" marginwidth="0" src="{osm_url}"
+            style="display:block;"></iframe>
+        </div>
+        <div style="margin-top:0; background:{ACCENT}; border-radius:0 0 16px 16px; padding:22px 24px;">
+          <h3 style="color:#fff; font-size:19px; font-weight:700; margin:0 0 6px;">📍 대상 구역 위치 분석</h3>
+          <p style="color:rgba(255,255,255,.82); font-size:13px; margin:0;">{region_name} · 입지 검토용 지도 (OpenStreetMap)</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.caption("⚠️ 예시 데이터 기반 간이 시뮬레이션 · 실제 사업 판단 시 정식 감정평가·정비계획 수립 필요")
