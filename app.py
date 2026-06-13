@@ -543,42 +543,44 @@ with right:
     style="width:100%;padding:11px 14px;border:1px solid #ccc;border-radius:10px;margin-bottom:8px;font-size:14px;box-sizing:border-box;"/>
   <div id="kmap" style="width:100%;height:380px;border-radius:14px;background:#eee;"></div>
   <div id="kinfo" style="margin-top:8px;font-size:13px;color:#333;"></div>
-  <script type="text/javascript"
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services"></script>
   <script>
-    window.onload = function() {{
-      if (typeof kakao === "undefined" || !kakao.maps) {{
-        document.getElementById('kinfo').innerHTML =
-          '⚠️ 카카오맵 로드 실패 — 카카오 개발자사이트에서 이 앱 도메인(Web 플랫폼)을 등록했는지 확인하세요.';
-        return;
-      }}
-      var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-      var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
-      var marker = new kakao.maps.Marker({{position:center, map:map}});
-      var circle = new kakao.maps.Circle({{
-        center:center, radius:{radius},
-        strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
-        fillColor:'#1B64DA', fillOpacity:0.18
-      }});
-      circle.setMap(map);
-      var ps = new kakao.maps.services.Places();
-      function moveTo(lat,lng,name){{
-        var pos = new kakao.maps.LatLng(lat,lng);
-        map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
-        document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
-      }}
-      document.getElementById('ksearch').addEventListener('keydown', function(e){{
-        if(e.key==='Enter'){{
-          e.preventDefault();
-          ps.keywordSearch(this.value, function(data,status){{
-            if(status===kakao.maps.services.Status.OK){{
-              moveTo(data[0].y, data[0].x, data[0].place_name);
-            }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다. 다른 키워드로 시도하세요.'; }}
-          }});
+    function initKakaoMap() {{
+      kakao.maps.load(function() {{
+        var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+        var map = new kakao.maps.Map(document.getElementById('kmap'), {{center:center, level:5}});
+        var marker = new kakao.maps.Marker({{position:center, map:map}});
+        var circle = new kakao.maps.Circle({{
+          center:center, radius:{radius},
+          strokeWeight:2, strokeColor:'#1B64DA', strokeOpacity:0.9, strokeStyle:'solid',
+          fillColor:'#1B64DA', fillOpacity:0.18
+        }});
+        circle.setMap(map);
+        var ps = new kakao.maps.services.Places();
+        function moveTo(lat,lng,name){{
+          var pos = new kakao.maps.LatLng(lat,lng);
+          map.setCenter(pos); marker.setPosition(pos); circle.setPosition(pos);
+          document.getElementById('kinfo').innerHTML = '📍 <b>'+name+'</b> · 반경 {radius}m 기준 분석';
         }}
+        document.getElementById('ksearch').addEventListener('keydown', function(e){{
+          if(e.key==='Enter'){{
+            e.preventDefault();
+            ps.keywordSearch(this.value, function(data,status){{
+              if(status===kakao.maps.services.Status.OK){{
+                moveTo(data[0].y, data[0].x, data[0].place_name);
+              }} else {{ document.getElementById('kinfo').innerHTML='검색 결과가 없습니다. 다른 키워드로 시도하세요.'; }}
+            }});
+          }}
+        }});
       }});
-    }};
+    }}
+    function kakaoFail() {{
+      document.getElementById('kinfo').innerHTML =
+        '⚠️ 카카오 SDK 로드 실패 — JavaScript 키가 맞는지, 도메인이 정확히 등록됐는지 확인하세요.';
+    }}
   </script>
+  <script type="text/javascript"
+    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_key}&libraries=services&autoload=false"
+    onload="initKakaoMap()" onerror="kakaoFail()"></script>
 </body>
 </html>"""
             st.components.v1.html(kakao_html, height=470)
