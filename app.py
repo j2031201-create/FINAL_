@@ -206,7 +206,7 @@ with st.sidebar:
     m_price = st.number_input("조합원분양가 (만원/㎡)", 0, value=st.session_state.get("v_mprice",760), step=10, key="v_mprice")
     cc = st.number_input("공사비 (만원/㎡)", 0, value=st.session_state.get("v_cc",200), step=5, key="v_cc")
     other_rate = st.slider("기타사업비율 (공사비 대비 %)", 20, 50, st.session_state.get("v_other",28 if pt=="small" else 35),
-                           help="공사비를 제외한 사업 부대비용의 비율 (설계·감리비, 각종 부담금, 신탁보수, 예비비 등 포함. PF 금융비용은 별도 계산)", key="v_other")/100
+                           help="설계·감리비, 각종 부담금, 신탁보수, 예비비 등 공사비 외 부대비용을 하나의 비율로 묶어 추정합니다 (사전타당성 단계의 표준 방식 · 세부 항목은 본 타당성에서 산정). PF 금융비용은 Advanced에서 별도 계산.", key="v_other")/100
 
     if ADV:
         st.markdown('<div class="side-h">🎯 인센티브 · 상가 · 금융 (Advanced)</div>', unsafe_allow_html=True)
@@ -594,6 +594,8 @@ with right:
 
         # ════════ 3) AI 종합평가 (입지·수주) ════════
         st.markdown('<div class="sec-title">🎯 AI 종합평가</div>', unsafe_allow_html=True)
+        if not addr_q.strip():
+            st.info("📍 위 **사업지 설정**에서 주소를 입력하면 입지·수주 분석이 활성화됩니다.")
         if st.button("🤖 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
                      disabled=not addr_q.strip()):
             loc_prompt = f"""당신은 한국 부동산 입지·정비사업 수주 분석 전문가입니다.
