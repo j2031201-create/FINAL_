@@ -48,6 +48,8 @@ st.set_page_config(page_title="정비사업 수주 타당성 분석", page_icon=
 
 if "mode" not in st.session_state:
     st.session_state.mode = "advanced" if False else "basic"
+if "ai_results" not in st.session_state:
+    st.session_state.ai_results = {}  # {consult, risk, report, location} 캐싱·저장용
 
 # 누적 데이터에서 "불러오기" 클릭 시: 입력값을 위젯 생성 전에 주입
 if "_restore" in st.session_state:
@@ -57,13 +59,19 @@ if "_restore" in st.session_state:
             "oldr":"v_oldr","lot":"v_lot","stype":"v_stype","agree":"v_agree","total":"v_total",
             "member":"v_member","avgm2":"v_avgm2","prev":"v_prev","gprice":"v_gprice",
             "mprice":"v_mprice","cc":"v_cc","other":"v_other","donation":"v_donation",
-            "shoparea":"v_shoparea","shopprice":"v_shopprice","pfrate":"v_pfrate","delay":"v_delay"}
+            "shoparea":"v_shoparea","shopprice":"v_shopprice","pfrate":"v_pfrate","delay":"v_delay",
+            "radius":"biz_radius","addr":"addr_q"}
     for k, v in rd.items():
         if k in _map and v is not None:
             st.session_state[_map[k]] = v
     # small 유형의 oldr은 별도 key(v_oldr2)
     if rd.get("pt")=="small" and rd.get("oldr") is not None:
         st.session_state["v_oldr2"] = rd["oldr"]
+    # 저장된 AI 분석 결과 복원 (재호출 없이 바로 표시 → API 절약)
+    if rd.get("ai_results"):
+        st.session_state.ai_results = rd["ai_results"]
+    else:
+        st.session_state.ai_results = {}
 
 ADV = st.session_state.mode == "advanced"
 
@@ -359,10 +367,13 @@ if save_clicked:
     inputs = dict(mode=st.session_state.mode, region=region_name, pt=pt, area=area,
                   year=year, diag=diag, oldr=oldr, lot=lot, stype=stype, agree=agree,
                   total=total_units, member=member_units, avgm2=avg_m2, prev=prev,
-                  gprice=g_price, mprice=m_price, cc=cc, other=int(other_rate*100))
+                  gprice=g_price, mprice=m_price, cc=cc, other=int(other_rate*100),
+                  radius=st.session_state.get("biz_radius",500), addr=st.session_state.get("addr_q",""))
     if ADV:
         inputs.update(donation=donation_rate, shoparea=shop_area, shopprice=shop_price,
                       pfrate=pf_rate, delay=delay_months)
+    # AI 분석 결과도 함께 저장 → 불러올 때 재호출 없이 복원 (API 절약)
+    inputs["ai_results"] = st.session_state.get("ai_results", {})
     row = dict(region_name=region_name, project_type=pt,
                small_type=stype if pt=="small" else None,
                area_sqm=area, built_year=year if pt=="rebuild" else None,
@@ -458,105 +469,24 @@ with left:
         st.info("연결 설정 시 누적 데이터가 표시됩니다.")
 
 with right:
-        # ── AI 어시스턴트 패널 ──────────────────────────────
-        st.markdown('<div class="sec-title">🤖 AI 어시스턴트</div>', unsafe_allow_html=True)
+        AR = st.session_state.ai_results  # AI 결과 캐시
 
         # 공통 입력 데이터 (계산 결과 기반)
         ai_input = f"""사업 유형: {PT_LABEL.get(pt, pt)}
-    구역명: {region_name}
-    비례율: {biz['biryul']:.1f}%
-    총사업비: {biz['total_cost']:.0f}억원
-    사업이익: {biz['profit']:.0f}억원
-    종전자산: {prev:.0f}억원
-    종후자산: {biz['post']:.0f}억원
-    법정요건 충족: {'예' if okv else '아니오'}
-    사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
+구역명: {region_name}
+비례율: {biz['biryul']:.1f}%
+총사업비: {biz['total_cost']:.0f}억원
+사업이익: {biz['profit']:.0f}억원
+종전자산: {prev:.0f}억원
+종후자산: {biz['post']:.0f}억원
+법정요건 충족: {'예' if okv else '아니오'}
+사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
 
-        # 1) AI 사업성 컨설턴트
-        if st.button("🤖 AI 컨설턴트 분석", use_container_width=True, key="ai_consult"):
-            prompt = f"""당신은 한국 정비사업(재건축·재개발) 전문 컨설턴트입니다.
-    다음 사업 데이터를 분석하고 전문가 의견을 제시해주세요.
-
-    [사업 데이터]
-    {ai_input}
-
-    다음 6가지를 한국어로 간결하게 답해주세요:
-    1. 사업성 등급: S/A/B/C/D 중 하나 + 근거 한 줄
-    2. 추진 권고 여부: 적극 추진 / 조건부 추진 / 보류 / 재검토 필요 중 하나 + 이유
-    3. 강점: 이 사업의 핵심 강점 2가지
-    4. 약점: 주요 리스크 요인 2가지
-    5. 추천 전략: 사업 추진 시 핵심 전략 2~3문장
-    6. 최종 의견: 수주사 입장에서의 종합 판단 2문장"""
-            with st.spinner("🤖 AI 컨설턴트 분석 중..."):
-                result = call_gemini(prompt, 2048)
-            st.markdown(f"""<div style="background:#F5F8FF;border:1.5px solid #1B64DA;border-radius:12px;
-                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
-                <b style="color:#1B64DA;">🤖 AI 사업성 컨설턴트 의견</b><br><br>{result}</div>""",
-                unsafe_allow_html=True)
-
-        # 2) AI 리스크 분석
-        if st.button("⚠️ 주요 리스크 분석", use_container_width=True, key="ai_risk"):
-            prompt = f"""당신은 한국 정비사업 리스크 분석 전문가입니다.
-    다음 사업의 리스크를 분석해주세요.
-
-    [사업 데이터]
-    {ai_input}
-
-    다음 4가지를 한국어로 분석해주세요:
-    1. 사업 실패 가능성: 낮음/중간/높음 + 주요 이유 2문장
-    2. 핵심 위험요소: 가장 중요한 리스크 3가지와 각 설명 한 줄
-    3. 민감도 분석: 비례율·분양가·공사비 변동 시 사업성 영향 2~3문장
-    4. 대응 전략: 각 리스크별 대응 방안 2~3문장"""
-            with st.spinner("⚠️ 리스크 분석 중..."):
-                result = call_gemini(prompt, 2048)
-            st.markdown(f"""<div style="background:#FFF8F0;border:1.5px solid #E8590C;border-radius:12px;
-                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
-                <b style="color:#E8590C;">⚠️ AI 리스크 분석 결과</b><br><br>{result}</div>""",
-                unsafe_allow_html=True)
-
-        # 3) AI 개발사업 보고서 생성
-        if st.button("📄 AI 보고서 생성", use_container_width=True, key="ai_report"):
-            prompt = f"""당신은 한국 정비사업 전문 보고서 작성자입니다.
-    다음 사업 데이터를 바탕으로 간략한 사업성 검토 보고서를 작성해주세요.
-
-    [사업 데이터]
-    {ai_input}
-
-    다음 구조로 마크다운 형식의 보고서를 작성해주세요:
-    ## 1. 사업 개요
-    (구역명, 사업 유형, 핵심 지표 요약 3~4문장)
-
-    ## 2. 시장 분석
-    (정비사업 시장 현황과 본 사업의 시장 포지셔닝 3~4문장)
-
-    ## 3. 사업성 평가
-    (비례율·수익성 분석 및 법정요건 충족 여부 4~5문장)
-
-    ## 4. 리스크 분석
-    (주요 위험요소 3가지와 대응방안)
-
-    ## 5. 추진 전략
-    (수주사 입장에서의 핵심 추진 전략 3~4문장)
-
-    ## 6. 최종 권고안
-    (수주 여부 최종 권고 및 조건 2~3문장)"""
-            with st.spinner("📄 AI 보고서 생성 중..."):
-                result = call_gemini(prompt, 2048)
-            st.markdown(f"""<div style="background:#F8FFF8;border:1.5px solid #2ecc71;border-radius:12px;
-                padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
-                <b style="color:#27ae60;">📄 AI 생성 사업성 검토 보고서</b><br><br>{result}</div>""",
-                unsafe_allow_html=True)
-            # 텍스트 다운로드 버튼
-            st.download_button("⬇️ 보고서 텍스트 다운로드", data=result,
-                file_name=f"{region_name}_AI사업성보고서.txt",
-                mime="text/plain", key="dl_report")
-        # ── AI 입지·수주 분석 엔진 (주소검색 + Folium 지도 + Gemini) ──
-        st.markdown('<div class="sec-title">🗺️ AI 입지·수주 분석</div>', unsafe_allow_html=True)
-
-        addr_q = st.text_input("📍 구역명·단지명·주소 검색", value="",
+        # ════════ 1) 사업지 설정 (지도) ════════
+        st.markdown('<div class="sec-title">📍 사업지 설정</div>', unsafe_allow_html=True)
+        addr_q = st.text_input("📍 구역명·단지명·주소 검색", value=st.session_state.get("addr_q",""),
             placeholder="예: 한남더힐, 성수전략정비구역, 잠실 자이, 왕십리역", key="addr_q")
 
-        # 좌표 결정: 검색하면 그 위치, 아니면 서울시청
         map_lat, map_lon, place_label = 37.5665, 126.9780, "서울시청 (기본 위치)"
         if addr_q.strip():
             geo = geocode(addr_q.strip())
@@ -566,10 +496,9 @@ with right:
             else:
                 st.warning("위치를 찾지 못했습니다. 단지명이 안 되면 '동 이름'이나 '가까운 역'으로 검색해보세요.")
 
-        # 사업단지 반경 (m) — 이 범위를 기준으로 입지 판단
-        radius = st.slider("📐 사업단지 반경 (m)", 100, 1500, 500, step=50, key="biz_radius")
+        radius = st.slider("📐 사업단지 반경 (m)", 100, 1500,
+                           st.session_state.get("biz_radius",500), step=50, key="biz_radius")
 
-        # ── Folium 지도 (마커 + 사업범위 원) · 키/도메인 불필요, 확실히 렌더 ──
         fmap = folium.Map(location=[map_lat, map_lon], zoom_start=15, tiles="OpenStreetMap")
         folium.Marker([map_lat, map_lon], tooltip=place_label[:40],
                       icon=folium.Icon(color="blue", icon="building", prefix="fa")).add_to(fmap)
@@ -577,10 +506,95 @@ with right:
                       color="#1B64DA", weight=2, fill=True, fill_color="#1B64DA",
                       fill_opacity=0.18, tooltip=f"사업단지 반경 {radius}m").add_to(fmap)
         st_folium(fmap, width=None, height=380, returned_objects=[], key="biz_map")
-        st.caption(f"📐 파란 원 = 사업단지 반경 {radius}m · 이 범위를 기준으로 AI가 입지를 분석합니다.")
+        st.caption(f"📐 파란 원 = 사업단지 반경 {radius}m · 이 범위를 기준으로 AI가 분석합니다.")
 
-        # AI 입지 분석 버튼
-        if st.button("🤖 AI 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
+        # ════════ 2) AI 어시스턴트 ════════
+        st.markdown('<div class="sec-title">🤖 AI 어시스턴트</div>', unsafe_allow_html=True)
+
+        # 2-1) AI 컨설턴트 분석
+        if st.button("🤖 AI 컨설턴트 분석", use_container_width=True, key="ai_consult"):
+            prompt = f"""당신은 한국 정비사업(재건축·재개발) 전문 컨설턴트입니다.
+다음 사업 데이터를 분석하고 전문가 의견을 제시해주세요.
+
+[사업 데이터]
+{ai_input}
+
+다음 6가지를 한국어로 간결하게 답해주세요:
+1. 사업성 등급: S/A/B/C/D 중 하나 + 근거 한 줄
+2. 추진 권고 여부: 적극 추진 / 조건부 추진 / 보류 / 재검토 필요 중 하나 + 이유
+3. 강점: 이 사업의 핵심 강점 2가지
+4. 약점: 주요 리스크 요인 2가지
+5. 추천 전략: 사업 추진 시 핵심 전략 2~3문장
+6. 최종 의견: 수주사 입장에서의 종합 판단 2문장"""
+            with st.spinner("🤖 AI 컨설턴트 분석 중..."):
+                AR["consult"] = call_gemini(prompt, 2048)
+        if AR.get("consult"):
+            st.markdown(f"""<div style="background:#F5F8FF;border:1.5px solid #1B64DA;border-radius:12px;
+                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#1B64DA;">🤖 AI 사업성 컨설턴트 의견</b><br><br>{AR['consult']}</div>""",
+                unsafe_allow_html=True)
+
+        # 2-2) AI 리스크 분석
+        if st.button("⚠️ 주요 리스크 분석", use_container_width=True, key="ai_risk"):
+            prompt = f"""당신은 한국 정비사업 리스크 분석 전문가입니다.
+다음 사업의 리스크를 분석해주세요.
+
+[사업 데이터]
+{ai_input}
+
+다음 4가지를 한국어로 분석해주세요:
+1. 사업 실패 가능성: 낮음/중간/높음 + 주요 이유 2문장
+2. 핵심 위험요소: 가장 중요한 리스크 3가지와 각 설명 한 줄
+3. 민감도 분석: 비례율·분양가·공사비 변동 시 사업성 영향 2~3문장
+4. 대응 전략: 각 리스크별 대응 방안 2~3문장"""
+            with st.spinner("⚠️ 리스크 분석 중..."):
+                AR["risk"] = call_gemini(prompt, 2048)
+        if AR.get("risk"):
+            st.markdown(f"""<div style="background:#FFF8F0;border:1.5px solid #E8590C;border-radius:12px;
+                padding:16px;margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#E8590C;">⚠️ AI 리스크 분석 결과</b><br><br>{AR['risk']}</div>""",
+                unsafe_allow_html=True)
+
+        # 2-3) AI 보고서 생성
+        if st.button("📄 AI 보고서 생성", use_container_width=True, key="ai_report"):
+            prompt = f"""당신은 한국 정비사업 전문 보고서 작성자입니다.
+다음 사업 데이터를 바탕으로 간략한 사업성 검토 보고서를 작성해주세요.
+
+[사업 데이터]
+{ai_input}
+
+다음 구조로 마크다운 형식의 보고서를 작성해주세요:
+## 1. 사업 개요
+(구역명, 사업 유형, 핵심 지표 요약 3~4문장)
+
+## 2. 시장 분석
+(정비사업 시장 현황과 본 사업의 시장 포지셔닝 3~4문장)
+
+## 3. 사업성 평가
+(비례율·수익성 분석 및 법정요건 충족 여부 4~5문장)
+
+## 4. 리스크 분석
+(주요 위험요소 3가지와 대응방안)
+
+## 5. 추진 전략
+(수주사 입장에서의 핵심 추진 전략 3~4문장)
+
+## 6. 최종 권고안
+(수주 여부 최종 권고 및 조건 2~3문장)"""
+            with st.spinner("📄 AI 보고서 생성 중..."):
+                AR["report"] = call_gemini(prompt, 2048)
+        if AR.get("report"):
+            st.markdown(f"""<div style="background:#F8FFF8;border:1.5px solid #2ecc71;border-radius:12px;
+                padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
+                <b style="color:#27ae60;">📄 AI 생성 사업성 검토 보고서</b><br><br>{AR['report']}</div>""",
+                unsafe_allow_html=True)
+            st.download_button("⬇️ 보고서 텍스트 다운로드", data=AR["report"],
+                file_name=f"{region_name}_AI사업성보고서.txt",
+                mime="text/plain", key="dl_report")
+
+        # ════════ 3) AI 종합평가 (입지·수주) ════════
+        st.markdown('<div class="sec-title">🎯 AI 종합평가</div>', unsafe_allow_html=True)
+        if st.button("🤖 입지·수주 성공률 분석", use_container_width=True, key="ai_location",
                      disabled=not addr_q.strip()):
             loc_prompt = f"""당신은 한국 부동산 입지·정비사업 수주 분석 전문가입니다.
 다음 위치와 사업 정보를 바탕으로 입지를 분석해주세요. 실제 해당 지역에 대한 지식을 활용하되, 추정임을 전제로 하세요.
@@ -613,12 +627,14 @@ with right:
 
 ## 5. 종합 총평 (3~4문장)
 - 수주 추천 여부와 차별화 전략"""
-            with st.spinner("🤖 입지·수주 분석 중... (지도 데이터 + AI)"):
-                result = call_gemini(loc_prompt, 2048)
+            with st.spinner("🤖 입지·수주 분석 중... (지도 + AI)"):
+                AR["location"] = call_gemini(loc_prompt, 2048)
+                AR["location_place"] = place_label[:45]
+        if AR.get("location"):
             st.markdown(f"""<div style="background:#F0F6FF;border:1.5px solid {ACCENT};border-radius:12px;
                 padding:16px;margin-top:8px;font-size:13px;line-height:1.7;color:#191F28;">
-                <b style="color:{ACCENT};">🗺️ AI 입지·수주 분석 리포트</b><br>
-                <span style="font-size:12px;color:#888;">📍 {place_label[:45]}</span><br><br>{result}</div>""",
+                <b style="color:{ACCENT};">🎯 AI 입지·수주 종합평가</b><br>
+                <span style="font-size:12px;color:#888;">📍 {AR.get('location_place','')}</span><br><br>{AR['location']}</div>""",
                 unsafe_allow_html=True)
             st.caption("※ AI 추정 분석입니다. 실제 사업 판단 시 현장 실사와 공공데이터 확인이 필요합니다.")
 
