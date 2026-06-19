@@ -693,19 +693,14 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
 법정요건 충족: {'예' if okv else '아니오'}
 사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
 
-        # ════════ 1) 사업지 설정 (지도) + 저장 버튼 (블록 폭에 맞춰 2열) ════════
-        st.markdown(f'<div class="sec-title">{T("site_title")}</div>', unsafe_allow_html=True)
-
-        # 저장/불러오기 버튼: 사업지 설정 블록 상단, 좌우 2열로 폭 일치
+        # ════════ 1) 저장 버튼 → 사업지 설정 (지도) ════════
+        # 저장 버튼: 사업지 설정 블록과 동일 폭(전체폭) · 제목은 버튼 아래로
         st.markdown('<div class="save-slot">', unsafe_allow_html=True)
-        sv1, sv2 = st.columns(2)
-        with sv1:
-            if st.button(T("save_btn"), use_container_width=True, disabled=not SB_ON, key="save_left"):
-                do_save()
-        with sv2:
-            if st.button(T("restore_open"), use_container_width=True, disabled=not SB_ON, key="restore_jump"):
-                st.toast("⬅️ " + (T("data_title")))
+        if st.button(T("save_btn"), use_container_width=True, disabled=not SB_ON, key="save_left"):
+            do_save()
         st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown(f'<div class="sec-title">{T("site_title")}</div>', unsafe_allow_html=True)
 
         addr_q = st.text_input(T("site_search"), value=st.session_state.get("addr_q",""),
             placeholder=T("site_ph"), key="addr_q")
