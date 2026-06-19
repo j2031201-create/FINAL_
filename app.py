@@ -739,19 +739,6 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
 
         map_lat, map_lon, place_label = 37.5665, 126.9780, T("site_default")
         if addr_q.strip():
-            # ── 임시 진단 (원인 확인 후 제거) ──
-            _diag_key = st.secrets.get("KAKAO_API_KEY", "")
-            with st.expander("🔧 검색 진단 (임시)", expanded=True):
-                st.write("REST 키 존재:", bool(_diag_key), "· 길이:", len(_diag_key))
-                if _diag_key:
-                    try:
-                        _r = requests.get("https://dapi.kakao.com/v2/local/search/keyword.json",
-                            params={"query": addr_q.strip(), "size": 1},
-                            headers={"Authorization": f"KakaoAK {_diag_key}"}, timeout=8)
-                        st.write("HTTP 상태:", _r.status_code)
-                        st.code(_r.text[:500])
-                    except Exception as e:
-                        st.write("요청 예외:", str(e))
             geo = geocode(addr_q.strip())
             if geo == "NOKEY":
                 st.warning(T("site_nokey"))
