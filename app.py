@@ -8,7 +8,6 @@ import datetime as dt
 import requests, json
 import streamlit.components.v1 as components
 
-
 st.set_page_config(page_title="정비사업 수주 타당성 분석 / Redevelopment Feasibility", page_icon="🏗️",
                    layout="wide", initial_sidebar_state="expanded")
 
@@ -139,6 +138,8 @@ L = {
                      "Location not found. Try a district name or the nearest station."),
     "site_nokey":("⚠️ 카카오 지도 API 키가 필요합니다. Streamlit secrets에 KAKAO_API_KEY를 추가하세요.",
                   "⚠️ Kakao Map API key required. Add KAKAO_API_KEY to Streamlit secrets."),
+    "site_nojskey":("⚠️ 지도 표시용 카카오 JavaScript 키가 필요합니다. Streamlit secrets에 KAKAO_JS_KEY를 추가하세요.",
+                    "⚠️ Kakao JavaScript key required to render the map. Add KAKAO_JS_KEY to Streamlit secrets."),
     "site_radius": ("📐 사업단지 반경 (m)", "📐 Project radius (m)"),
     "site_tip":    ("📐 파란 원 = 사업단지 반경 {r}m · 이 범위를 기준으로 AI가 분석합니다.",
                     "📐 Blue circle = {r}m project radius · AI analyzes within this range."),
@@ -726,7 +727,6 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
 사업 판정: {'수주 적합' if FIT else '수주 부적합'}"""
 
         # ════════ 1) 저장 버튼 → 사업지 설정 (지도) ════════
-        # 저장 버튼: 사업지 설정 블록과 동일 폭(전체폭) · 제목은 버튼 아래로
         st.markdown('<div class="save-slot">', unsafe_allow_html=True)
         if st.button(T("save_btn"), use_container_width=True, disabled=not SB_ON, key="save_left"):
             do_save()
@@ -748,108 +748,38 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
             else:
                 st.warning(T("site_notfound"))
 
-        radius = st.slider(
-            T("site_radius"),
-            100,
-            1500,
-            st.session_state.get("biz_radius", 500),
-            step=50,
-            key="biz_radius"
-        )
+        radius = st.slider(T("site_radius"), 100, 1500,
+                           st.session_state.get("biz_radius",500), step=50, key="biz_radius")
 
+        # 카카오맵 JS SDK (한국 지도 정확) — JS 키 필요
         kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
-
         if kakao_js_key:
-
+            _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
             map_html = f"""
             <div id="map" style="width:100%;height:380px;border-radius:12px;"></div>
-
             <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}"></script>
-
             <script>
-            var container = document.getElementById('map');
-
-            var options = {{
-                center: new kakao.maps.LatLng({map_lat}, {map_lon}),
-                level: 4
-            }};
-
-            var map = new kakao.maps.Map(container, options);
-
-            var markerPosition = new kakao.maps.LatLng({map_lat}, {map_lon});
-
-            var marker = new kakao.maps.Marker({{
-                position: markerPosition
-            }});
-
-            marker.setMap(map);
-
-            var circle = new kakao.maps.Circle({{
-                center: markerPosition,
-                radius: {radius},
-                strokeWeight: 3,
-                strokeColor: '#1B64DA',
-                strokeOpacity: 0.8,
-                strokeStyle: 'solid',
-                fillColor: '#1B64DA',
-                fillOpacity: 0.15
-            }});
-
-            circle.setMap(map);
+              var container = document.getElementById('map');
+              var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+              var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
+              var marker = new kakao.maps.Marker({{ position: center }});
+              marker.setMap(map);
+              var circle = new kakao.maps.Circle({{
+                center: center, radius: {radius},
+                strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
+                fillColor: '#1B64DA', fillOpacity: 0.15
+              }});
+              circle.setMap(map);
+              var iw = new kakao.maps.InfoWindow({{
+                position: center,
+                content: '<div style="padding:5px 8px;font-size:12px;">{_safe_label}</div>'
+              }});
+              iw.open(map, marker);
             </script>
             """
-
-            components.html(
-                map_html,
-                height=400
-            )
-
+            components.html(map_html, height=400)
         else:
-            st.error("KAKAO_JS_KEY가 설정되지 않았습니다.")
-
-        st.caption(T("site_tip", r=radius))
-
-            <script>
-            var container = document.getElementById('map');
-
-            var options = {{
-                center: new kakao.maps.LatLng({map_lat}, {map_lon}),
-                level: 4
-            }};
-
-            var map = new kakao.maps.Map(container, options);
-
-            var markerPosition = new kakao.maps.LatLng({map_lat}, {map_lon});
-
-            var marker = new kakao.maps.Marker({{
-                position: markerPosition
-            }});
-
-            marker.setMap(map);
-
-            var circle = new kakao.maps.Circle({{
-                center : markerPosition,
-                radius : {radius},
-                strokeWeight : 3,
-                strokeColor : '#1B64DA',
-                strokeOpacity : 0.8,
-                strokeStyle : 'solid',
-                fillColor : '#1B64DA',
-                fillOpacity : 0.15
-            }});
-
-            circle.setMap(map);
-            </script>
-            """
-
-            components.html(
-                map_html,
-                height=400
-            )
-
-        else:
-            st.error("KAKAO_JS_KEY가 설정되지 않았습니다.")
-
+            st.warning(T("site_nojskey"))
         st.caption(T("site_tip", r=radius))
 
         # ════════ 2) AI 어시스턴트 ════════
