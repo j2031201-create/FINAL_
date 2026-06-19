@@ -754,6 +754,9 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
         # 카카오맵 JS SDK (한국 지도 정확) — JS 키 필요
         # autoload=false + kakao.maps.load() 콜백으로 로딩 타이밍 문제 해결
         kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
+        with st.expander("🔧 지도 진단 (임시)", expanded=True):
+            st.write("JS 키 존재:", bool(kakao_js_key), "· 길이:", len(kakao_js_key))
+            st.write("좌표:", map_lat, map_lon, "· 반경:", radius)
         if kakao_js_key:
             _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
             map_html = f"""<!DOCTYPE html>
@@ -761,8 +764,14 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
 <style>html,body,#map{{margin:0;padding:0;width:100%;height:380px;}}#map{{border-radius:12px;}}</style>
 </head><body>
 <div id="map"></div>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false"></script>
+<div id="dbg" style="font-size:12px;color:#c00;padding:4px;"></div>
+<script
+  src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false"
+  onerror="document.getElementById('dbg').innerText='❌ SDK 로드 실패: 도메인 미등록 또는 JS키 오류';"></script>
 <script>
+  if (typeof kakao === 'undefined') {{
+    document.getElementById('dbg').innerText='❌ kakao 객체 없음: JS키 또는 도메인 등록 확인 필요';
+  }} else {{
   kakao.maps.load(function() {{
     var container = document.getElementById('map');
     var center = new kakao.maps.LatLng({map_lat}, {map_lon});
@@ -781,6 +790,7 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
     }});
     iw.open(map, marker);
   }});
+  }}
 </script>
 </body></html>"""
             components.html(map_html, height=400, scrolling=False)
