@@ -761,42 +761,46 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
             _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
             map_html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<style>html,body{{margin:0;padding:0;}}#map{{width:100%;height:360px;border-radius:12px;background:#eef;}}
-#dbg{{font-size:12px;color:#c00;padding:6px;font-family:sans-serif;}}</style>
+<style>html,body{{margin:0;padding:0;font-family:sans-serif;}}
+#map{{width:100%;height:340px;border-radius:12px;background:#eef;}}
+#dbg{{font-size:12px;color:#06c;padding:6px;white-space:pre-wrap;}}</style>
 </head><body>
 <div id="map"></div>
-<div id="dbg">⏳ 지도 로딩 시도 중...</div>
+<div id="dbg">⏳ 진단 시작...</div>
 <script>
-  function dbg(msg){{ document.getElementById('dbg').innerText = msg; }}
-  window.onerror = function(m){{ dbg('❌ JS 오류: ' + m); }};
-  var s = document.createElement('script');
-  s.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false";
-  s.onerror = function(){{ dbg('❌ SDK 파일 로드 실패 (네트워크/JS키)'); }};
-  s.onload = function(){{
-    if (typeof kakao === 'undefined' || !kakao.maps) {{ dbg('❌ kakao 객체 없음 (도메인 미등록 의심)'); return; }}
-    try {{
-      kakao.maps.load(function() {{
+  var dbgEl = document.getElementById('dbg');
+  function dbg(m){{ dbgEl.innerText = m; }}
+  var SDK = "https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false";
+
+  // 1단계: SDK URL을 fetch로 직접 호출해 응답 확인
+  fetch(SDK).then(function(r){{
+    dbg('SDK fetch 상태: ' + r.status + ' (200이면 키/도메인 정상)');
+    return r.text();
+  }}).then(function(t){{
+    // 2단계: 정상이면 실제 script 주입
+    var sc = document.createElement('script');
+    sc.src = SDK;
+    sc.onload = function(){{
+      if (typeof kakao === 'undefined' || !kakao.maps){{ dbg('❌ kakao 객체 없음'); return; }}
+      kakao.maps.load(function(){{
         try {{
-          var container = document.getElementById('map');
-          var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-          var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
-          var marker = new kakao.maps.Marker({{ position: center }});
-          marker.setMap(map);
-          var circle = new kakao.maps.Circle({{
-            center: center, radius: {radius},
-            strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
-            fillColor: '#1B64DA', fillOpacity: 0.15
-          }});
-          circle.setMap(map);
+          var c = new kakao.maps.LatLng({map_lat}, {map_lon});
+          var map = new kakao.maps.Map(document.getElementById('map'), {{center:c, level:5}});
+          new kakao.maps.Marker({{position:c}}).setMap(map);
+          new kakao.maps.Circle({{center:c, radius:{radius}, strokeWeight:3,
+            strokeColor:'#1B64DA', strokeOpacity:0.8, fillColor:'#1B64DA', fillOpacity:0.15}}).setMap(map);
           dbg('✅ 지도 렌더링 완료');
-        }} catch(e) {{ dbg('❌ 지도 생성 오류: ' + e.message); }}
+        }} catch(e){{ dbg('❌ 렌더 오류: ' + e.message); }}
       }});
-    }} catch(e) {{ dbg('❌ load 호출 오류: ' + e.message); }}
-  }};
-  document.head.appendChild(s);
+    }};
+    sc.onerror = function(){{ dbg('❌ script 주입 실패'); }};
+    document.head.appendChild(sc);
+  }}).catch(function(e){{
+    dbg('❌ SDK fetch 실패: ' + e.message + '\\n→ 카카오 콘솔 플랫폼>Web 도메인 등록 확인 필요');
+  }});
 </script>
 </body></html>"""
-            components.html(map_html, height=420, scrolling=False)
+            components.html(map_html, height=400, scrolling=False)
         else:
             st.warning(T("site_nojskey"))
         st.caption(T("site_tip", r=radius))
