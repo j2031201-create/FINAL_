@@ -6,8 +6,7 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 import requests, json
-import folium
-from streamlit_folium import st_folium
+
 
 st.set_page_config(page_title="정비사업 수주 타당성 분석 / Redevelopment Feasibility", page_icon="🏗️",
                    layout="wide", initial_sidebar_state="expanded")
