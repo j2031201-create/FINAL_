@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 import requests, json
+import streamlit.components.v1 as components
 
 
 st.set_page_config(page_title="정비사업 수주 타당성 분석 / Redevelopment Feasibility", page_icon="🏗️",
@@ -747,10 +748,16 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
             else:
                 st.warning(T("site_notfound"))
 
-        radius = st.slider(T("site_radius"), 100, 1500,
-                           st.session_state.get("biz_radius",500), step=50, key="biz_radius")
+        radius = st.slider(
+            T("site_radius"),
+            100,
+            1500,
+            st.session_state.get("biz_radius", 500),
+            step=50,
+            key="biz_radius"
+        )
 
-                kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
+        kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
 
         if kakao_js_key:
 
@@ -758,6 +765,49 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
             <div id="map" style="width:100%;height:380px;border-radius:12px;"></div>
 
             <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}"></script>
+
+            <script>
+            var container = document.getElementById('map');
+
+            var options = {{
+                center: new kakao.maps.LatLng({map_lat}, {map_lon}),
+                level: 4
+            }};
+
+            var map = new kakao.maps.Map(container, options);
+
+            var markerPosition = new kakao.maps.LatLng({map_lat}, {map_lon});
+
+            var marker = new kakao.maps.Marker({{
+                position: markerPosition
+            }});
+
+            marker.setMap(map);
+
+            var circle = new kakao.maps.Circle({{
+                center: markerPosition,
+                radius: {radius},
+                strokeWeight: 3,
+                strokeColor: '#1B64DA',
+                strokeOpacity: 0.8,
+                strokeStyle: 'solid',
+                fillColor: '#1B64DA',
+                fillOpacity: 0.15
+            }});
+
+            circle.setMap(map);
+            </script>
+            """
+
+            components.html(
+                map_html,
+                height=400
+            )
+
+        else:
+            st.error("KAKAO_JS_KEY가 설정되지 않았습니다.")
+
+        st.caption(T("site_tip", r=radius))
 
             <script>
             var container = document.getElementById('map');
