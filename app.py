@@ -137,6 +137,8 @@ L = {
     "site_found":  ("📍 {place}", "📍 {place}"),
     "site_notfound":("위치를 찾지 못했습니다. 단지명이 안 되면 '동 이름'이나 '가까운 역'으로 검색해보세요.",
                      "Location not found. Try a district name or the nearest station."),
+    "site_nokey":("⚠️ 카카오 지도 API 키가 필요합니다. Streamlit secrets에 KAKAO_API_KEY를 추가하세요.",
+                  "⚠️ Kakao Map API key required. Add KAKAO_API_KEY to Streamlit secrets."),
     "site_radius": ("📐 사업단지 반경 (m)", "📐 Project radius (m)"),
     "site_tip":    ("📐 파란 원 = 사업단지 반경 {r}m · 이 범위를 기준으로 AI가 분석합니다.",
                     "📐 Blue circle = {r}m project radius · AI analyzes within this range."),
@@ -228,52 +230,49 @@ def call_gemini(prompt: str, max_tokens: int = 2048) -> str:
     except Exception as e:
         return f"⚠️ AI 응답 오류: {str(e)[:80]}" if not EN else f"⚠️ AI error: {str(e)[:80]}"
 
-def _geo_variants(query: str):
-    """단지명·구역명 검색 성공률을 높이는 변형 쿼리 생성"""
-    q = query.strip()
-    v = [q]
-    if not any(x in q for x in ["서울","시","도","구 "]):
-        v.append(f"{q}, 서울")
-    v.append(f"{q}, 대한민국")
-    for suf in ["아파트","단지","구역","재건축","재개발","정비"]:
-        if q.endswith(suf): v.append(q[:-len(suf)].strip())
-    seen=set(); out=[]
-    for x in v:
-        if x and x not in seen: seen.add(x); out.append(x)
-    return out
+def _kakao_headers():
+    key = st.secrets.get("KAKAO_API_KEY", "")
+    return {"Authorization": f"KakaoAK {key}"} if key else None
 
-def _try_nominatim(q):
-    r = requests.get("https://nominatim.openstreetmap.org/search",
-        params={"q": q, "format":"json","limit":1,"countrycodes":"kr","accept-language":"ko"},
-        headers={"User-Agent":"Mozilla/5.0 RedevelopmentFeasibility/1.0",
-                 "Referer":"https://streamlit.io","Accept-Language":"ko,en"}, timeout=8)
+def _kakao_keyword(q, headers):
+    """카카오 키워드 검색 — 역·단지·구역명 등 장소명에 강함"""
+    r = requests.get("https://dapi.kakao.com/v2/local/search/keyword.json",
+        params={"query": q, "size": 1}, headers=headers, timeout=8)
     if r.status_code==200:
-        d=r.json()
-        if d: return float(d[0]["lat"]), float(d[0]["lon"]), d[0].get("display_name","")
+        docs=r.json().get("documents",[])
+        if docs:
+            d=docs[0]
+            name=d.get("place_name","")
+            addr=d.get("road_address_name") or d.get("address_name","")
+            label=f"{name} ({addr})" if addr else name
+            return float(d["y"]), float(d["x"]), label
     return None
 
-def _try_photon(q):
-    r = requests.get("https://photon.komoot.io/api/",
-        params={"q": q, "limit":1}, timeout=8)
+def _kakao_address(q, headers):
+    """카카오 주소 검색 — 도로명·지번 주소에 강함 (키워드 실패 시 폴백)"""
+    r = requests.get("https://dapi.kakao.com/v2/local/search/address.json",
+        params={"query": q, "size": 1}, headers=headers, timeout=8)
     if r.status_code==200:
-        feats=r.json().get("features",[])
-        if feats:
-            c=feats[0]["geometry"]["coordinates"]  # [lon,lat]
-            p=feats[0]["properties"]
-            name=", ".join(x for x in [p.get("name"),p.get("district"),p.get("city"),p.get("state")] if x)
-            return c[1], c[0], (name or q)
+        docs=r.json().get("documents",[])
+        if docs:
+            d=docs[0]
+            return float(d["y"]), float(d["x"]), d.get("address_name","")
     return None
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def geocode(query: str):
-    """주소·지명 → 위경도. 2개 서비스(Nominatim·Photon) × 변형 쿼리 순차 폴백."""
-    for q in _geo_variants(query):
-        for fn in (_try_nominatim, _try_photon):
-            try:
-                res = fn(q)
-                if res: return res
-            except Exception:
-                continue
+    """카카오 로컬 API로 한국 지명·역·단지·주소 검색. 키워드→주소 폴백.
+    반환: (lat, lon, label) / 실패 None / 키없음 'NOKEY'"""
+    headers = _kakao_headers()
+    if not headers:
+        return "NOKEY"
+    q = query.strip()
+    for fn in (_kakao_keyword, _kakao_address):
+        try:
+            res = fn(q, headers)
+            if res: return res
+        except Exception:
+            continue
     return None
 
 if "mode" not in st.session_state:
@@ -741,7 +740,9 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
         map_lat, map_lon, place_label = 37.5665, 126.9780, T("site_default")
         if addr_q.strip():
             geo = geocode(addr_q.strip())
-            if geo:
+            if geo == "NOKEY":
+                st.warning(T("site_nokey"))
+            elif geo:
                 map_lat, map_lon, place_label = geo
                 st.success(T("site_found", place=place_label[:55]))
             else:
