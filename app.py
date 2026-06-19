@@ -66,6 +66,8 @@ L = {
     "in_shopprice":("상가 분양가 (만원/㎡)", "Retail sale price (10K KRW/㎡)"),
     "in_pfrate":   ("예상 PF 금리 (%)", "Expected PF rate (%)"),
     "in_delay":    ("사업 지연 기간 (개월)", "Project delay (months)"),
+    "help_delay":  ("기본 공사기간 24개월(2년)을 기준으로, 추가 지연분만큼 PF 금융비용이 늘어납니다. (0개월이어도 기본 2년치 금융비용은 발생)",
+                    "Assumes a 24-month (2-year) base construction period; PF financing cost rises with any additional delay. (Even at 0 months, the 2-year base financing cost still applies.)"),
     # 구역정보 바
     "tag_sample":  ("예시 데이터", "Sample Data"),
     "save_btn":    ("💾 이 분석 저장", "💾 Save Analysis"),
@@ -460,7 +462,7 @@ with st.sidebar:
         shop_area = st.number_input(T("in_shoparea"), 0, value=st.session_state.get("v_shoparea",1650), step=50, key="v_shoparea")
         shop_price = st.number_input(T("in_shopprice"), 0, value=st.session_state.get("v_shopprice",1200), step=50, key="v_shopprice")
         pf_rate = st.number_input(T("in_pfrate"), 0.0, value=st.session_state.get("v_pfrate",8.0), step=0.1, key="v_pfrate")
-        delay_months = st.slider(T("in_delay"), 0, 36, st.session_state.get("v_delay",0), key="v_delay")
+        delay_months = st.slider(T("in_delay"), 0, 36, st.session_state.get("v_delay",0), help=T("help_delay"), key="v_delay")
 
 # ── 계산 (로직 보존) ──────────────────────────────────
 if ADV:
