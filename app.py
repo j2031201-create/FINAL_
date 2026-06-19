@@ -752,32 +752,38 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
                            st.session_state.get("biz_radius",500), step=50, key="biz_radius")
 
         # 카카오맵 JS SDK (한국 지도 정확) — JS 키 필요
+        # autoload=false + kakao.maps.load() 콜백으로 로딩 타이밍 문제 해결
         kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
         if kakao_js_key:
             _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
-            map_html = f"""
-            <div id="map" style="width:100%;height:380px;border-radius:12px;"></div>
-            <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}"></script>
-            <script>
-              var container = document.getElementById('map');
-              var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-              var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
-              var marker = new kakao.maps.Marker({{ position: center }});
-              marker.setMap(map);
-              var circle = new kakao.maps.Circle({{
-                center: center, radius: {radius},
-                strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
-                fillColor: '#1B64DA', fillOpacity: 0.15
-              }});
-              circle.setMap(map);
-              var iw = new kakao.maps.InfoWindow({{
-                position: center,
-                content: '<div style="padding:5px 8px;font-size:12px;">{_safe_label}</div>'
-              }});
-              iw.open(map, marker);
-            </script>
-            """
-            components.html(map_html, height=400)
+            map_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body,#map{{margin:0;padding:0;width:100%;height:380px;}}#map{{border-radius:12px;}}</style>
+</head><body>
+<div id="map"></div>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false"></script>
+<script>
+  kakao.maps.load(function() {{
+    var container = document.getElementById('map');
+    var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+    var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
+    var marker = new kakao.maps.Marker({{ position: center }});
+    marker.setMap(map);
+    var circle = new kakao.maps.Circle({{
+      center: center, radius: {radius},
+      strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
+      fillColor: '#1B64DA', fillOpacity: 0.15
+    }});
+    circle.setMap(map);
+    var iw = new kakao.maps.InfoWindow({{
+      position: center,
+      content: '<div style="padding:5px 8px;font-size:12px;">{_safe_label}</div>'
+    }});
+    iw.open(map, marker);
+  }});
+</script>
+</body></html>"""
+            components.html(map_html, height=400, scrolling=False)
         else:
             st.warning(T("site_nojskey"))
         st.caption(T("site_tip", r=radius))
