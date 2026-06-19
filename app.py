@@ -228,19 +228,52 @@ def call_gemini(prompt: str, max_tokens: int = 2048) -> str:
     except Exception as e:
         return f"⚠️ AI 응답 오류: {str(e)[:80]}" if not EN else f"⚠️ AI error: {str(e)[:80]}"
 
+def _geo_variants(query: str):
+    """단지명·구역명 검색 성공률을 높이는 변형 쿼리 생성"""
+    q = query.strip()
+    v = [q]
+    if not any(x in q for x in ["서울","시","도","구 "]):
+        v.append(f"{q}, 서울")
+    v.append(f"{q}, 대한민국")
+    for suf in ["아파트","단지","구역","재건축","재개발","정비"]:
+        if q.endswith(suf): v.append(q[:-len(suf)].strip())
+    seen=set(); out=[]
+    for x in v:
+        if x and x not in seen: seen.add(x); out.append(x)
+    return out
+
+def _try_nominatim(q):
+    r = requests.get("https://nominatim.openstreetmap.org/search",
+        params={"q": q, "format":"json","limit":1,"countrycodes":"kr","accept-language":"ko"},
+        headers={"User-Agent":"Mozilla/5.0 RedevelopmentFeasibility/1.0",
+                 "Referer":"https://streamlit.io","Accept-Language":"ko,en"}, timeout=8)
+    if r.status_code==200:
+        d=r.json()
+        if d: return float(d[0]["lat"]), float(d[0]["lon"]), d[0].get("display_name","")
+    return None
+
+def _try_photon(q):
+    r = requests.get("https://photon.komoot.io/api/",
+        params={"q": q, "limit":1}, timeout=8)
+    if r.status_code==200:
+        feats=r.json().get("features",[])
+        if feats:
+            c=feats[0]["geometry"]["coordinates"]  # [lon,lat]
+            p=feats[0]["properties"]
+            name=", ".join(x for x in [p.get("name"),p.get("district"),p.get("city"),p.get("state")] if x)
+            return c[1], c[0], (name or q)
+    return None
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def geocode(query: str):
-    """주소·지명 → 위경도 (Nominatim, 무료·키 불필요). 실패 시 None"""
-    try:
-        r = requests.get("https://nominatim.openstreetmap.org/search",
-            params={"q": query, "format": "json", "limit": 1, "countrycodes": "kr"},
-            headers={"User-Agent": "jeongbi-feasibility-app"}, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        if data:
-            return float(data[0]["lat"]), float(data[0]["lon"]), data[0].get("display_name", query)
-    except Exception:
-        pass
+    """주소·지명 → 위경도. 2개 서비스(Nominatim·Photon) × 변형 쿼리 순차 폴백."""
+    for q in _geo_variants(query):
+        for fn in (_try_nominatim, _try_photon):
+            try:
+                res = fn(q)
+                if res: return res
+            except Exception:
+                continue
     return None
 
 if "mode" not in st.session_state:
