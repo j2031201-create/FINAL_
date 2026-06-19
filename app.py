@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 import requests, json
-import streamlit.components.v1 as components
+import pydeck as pdk
 
 st.set_page_config(page_title="정비사업 수주 타당성 분석 / Redevelopment Feasibility", page_icon="🏗️",
                    layout="wide", initial_sidebar_state="expanded")
@@ -751,58 +751,27 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
         radius = st.slider(T("site_radius"), 100, 1500,
                            st.session_state.get("biz_radius",500), step=50, key="biz_radius")
 
-        # 카카오맵 JS SDK (한국 지도 정확) — JS 키 필요
-        # autoload=false + kakao.maps.load() 콜백으로 로딩 타이밍 문제 해결
-        kakao_js_key = st.secrets.get("KAKAO_JS_KEY", "")
-        with st.expander("🔧 지도 진단 (임시)", expanded=True):
-            st.write("JS 키 존재:", bool(kakao_js_key), "· 길이:", len(kakao_js_key))
-            st.write("좌표:", map_lat, map_lon, "· 반경:", radius)
-        if kakao_js_key:
-            _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
-            map_html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>html,body{{margin:0;padding:0;font-family:sans-serif;}}
-#map{{width:100%;height:340px;border-radius:12px;background:#eef;}}
-#dbg{{font-size:12px;color:#06c;padding:6px;white-space:pre-wrap;}}</style>
-</head><body>
-<div id="map"></div>
-<div id="dbg">⏳ 진단 시작...</div>
-<script>
-  var dbgEl = document.getElementById('dbg');
-  function dbg(m){{ dbgEl.innerText = m; }}
-  var SDK = "https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false";
-
-  // 1단계: SDK URL을 fetch로 직접 호출해 응답 확인
-  fetch(SDK).then(function(r){{
-    dbg('SDK fetch 상태: ' + r.status + ' (200이면 키/도메인 정상)');
-    return r.text();
-  }}).then(function(t){{
-    // 2단계: 정상이면 실제 script 주입
-    var sc = document.createElement('script');
-    sc.src = SDK;
-    sc.onload = function(){{
-      if (typeof kakao === 'undefined' || !kakao.maps){{ dbg('❌ kakao 객체 없음'); return; }}
-      kakao.maps.load(function(){{
-        try {{
-          var c = new kakao.maps.LatLng({map_lat}, {map_lon});
-          var map = new kakao.maps.Map(document.getElementById('map'), {{center:c, level:5}});
-          new kakao.maps.Marker({{position:c}}).setMap(map);
-          new kakao.maps.Circle({{center:c, radius:{radius}, strokeWeight:3,
-            strokeColor:'#1B64DA', strokeOpacity:0.8, fillColor:'#1B64DA', fillOpacity:0.15}}).setMap(map);
-          dbg('✅ 지도 렌더링 완료');
-        }} catch(e){{ dbg('❌ 렌더 오류: ' + e.message); }}
-      }});
-    }};
-    sc.onerror = function(){{ dbg('❌ script 주입 실패'); }};
-    document.head.appendChild(sc);
-  }}).catch(function(e){{
-    dbg('❌ SDK fetch 실패: ' + e.message + '\\n→ 카카오 콘솔 플랫폼>Web 도메인 등록 확인 필요');
-  }});
-</script>
-</body></html>"""
-            components.html(map_html, height=400, scrolling=False)
-        else:
-            st.warning(T("site_nojskey"))
+        # 지도 표시: pydeck (streamlit 내장 · iframe/CORS/키 문제 없음)
+        # 검색은 카카오(정확) · 표시는 pydeck (마커 + 반경 원)
+        _circle_df = pd.DataFrame([{"lat": map_lat, "lon": map_lon, "radius": radius}])
+        _marker_df = pd.DataFrame([{"lat": map_lat, "lon": map_lon, "name": place_label[:40]}])
+        _circle_layer = pdk.Layer(
+            "ScatterplotLayer", data=_circle_df,
+            get_position='[lon, lat]', get_radius="radius",
+            get_fill_color=[27, 100, 218, 40], get_line_color=[27, 100, 218, 200],
+            line_width_min_pixels=2, stroked=True, filled=True, pickable=False)
+        _marker_layer = pdk.Layer(
+            "ScatterplotLayer", data=_marker_df,
+            get_position='[lon, lat]', get_radius=30,
+            get_fill_color=[232, 89, 12, 255], get_line_color=[255, 255, 255, 255],
+            line_width_min_pixels=2, stroked=True, filled=True, pickable=True)
+        _zoom = 15 if radius<=400 else 14 if radius<=800 else 13
+        _deck = pdk.Deck(
+            map_style=None,  # 기본 지도 (키 불필요)
+            initial_view_state=pdk.ViewState(latitude=map_lat, longitude=map_lon, zoom=_zoom, pitch=0),
+            layers=[_circle_layer, _marker_layer],
+            tooltip={"text": "{name}"})
+        st.pydeck_chart(_deck, use_container_width=True)
         st.caption(T("site_tip", r=radius))
 
         # ════════ 2) AI 어시스턴트 ════════
