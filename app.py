@@ -761,39 +761,42 @@ Bid verdict: {'Suitable' if FIT else 'Not suitable'}"""
             _safe_label = place_label[:40].replace("'", " ").replace('"', " ")
             map_html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<style>html,body,#map{{margin:0;padding:0;width:100%;height:380px;}}#map{{border-radius:12px;}}</style>
+<style>html,body{{margin:0;padding:0;}}#map{{width:100%;height:360px;border-radius:12px;background:#eef;}}
+#dbg{{font-size:12px;color:#c00;padding:6px;font-family:sans-serif;}}</style>
 </head><body>
 <div id="map"></div>
-<div id="dbg" style="font-size:12px;color:#c00;padding:4px;"></div>
-<script
-  src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false"
-  onerror="document.getElementById('dbg').innerText='❌ SDK 로드 실패: 도메인 미등록 또는 JS키 오류';"></script>
+<div id="dbg">⏳ 지도 로딩 시도 중...</div>
 <script>
-  if (typeof kakao === 'undefined') {{
-    document.getElementById('dbg').innerText='❌ kakao 객체 없음: JS키 또는 도메인 등록 확인 필요';
-  }} else {{
-  kakao.maps.load(function() {{
-    var container = document.getElementById('map');
-    var center = new kakao.maps.LatLng({map_lat}, {map_lon});
-    var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
-    var marker = new kakao.maps.Marker({{ position: center }});
-    marker.setMap(map);
-    var circle = new kakao.maps.Circle({{
-      center: center, radius: {radius},
-      strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
-      fillColor: '#1B64DA', fillOpacity: 0.15
-    }});
-    circle.setMap(map);
-    var iw = new kakao.maps.InfoWindow({{
-      position: center,
-      content: '<div style="padding:5px 8px;font-size:12px;">{_safe_label}</div>'
-    }});
-    iw.open(map, marker);
-  }});
-  }}
+  function dbg(msg){{ document.getElementById('dbg').innerText = msg; }}
+  window.onerror = function(m){{ dbg('❌ JS 오류: ' + m); }};
+  var s = document.createElement('script');
+  s.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_js_key}&autoload=false";
+  s.onerror = function(){{ dbg('❌ SDK 파일 로드 실패 (네트워크/JS키)'); }};
+  s.onload = function(){{
+    if (typeof kakao === 'undefined' || !kakao.maps) {{ dbg('❌ kakao 객체 없음 (도메인 미등록 의심)'); return; }}
+    try {{
+      kakao.maps.load(function() {{
+        try {{
+          var container = document.getElementById('map');
+          var center = new kakao.maps.LatLng({map_lat}, {map_lon});
+          var map = new kakao.maps.Map(container, {{ center: center, level: 5 }});
+          var marker = new kakao.maps.Marker({{ position: center }});
+          marker.setMap(map);
+          var circle = new kakao.maps.Circle({{
+            center: center, radius: {radius},
+            strokeWeight: 3, strokeColor: '#1B64DA', strokeOpacity: 0.8, strokeStyle: 'solid',
+            fillColor: '#1B64DA', fillOpacity: 0.15
+          }});
+          circle.setMap(map);
+          dbg('✅ 지도 렌더링 완료');
+        }} catch(e) {{ dbg('❌ 지도 생성 오류: ' + e.message); }}
+      }});
+    }} catch(e) {{ dbg('❌ load 호출 오류: ' + e.message); }}
+  }};
+  document.head.appendChild(s);
 </script>
 </body></html>"""
-            components.html(map_html, height=400, scrolling=False)
+            components.html(map_html, height=420, scrolling=False)
         else:
             st.warning(T("site_nojskey"))
         st.caption(T("site_tip", r=radius))
